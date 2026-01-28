@@ -4,6 +4,20 @@
 
 ---
 
+## First Meetup: January 30, 2026
+
+| | |
+|---|---|
+| **Date** | Friday, January 30, 2026 |
+| **Time** | 16:00 – 21:30 CET |
+| **Location** | STARTPLATZ Köln, Im Mediapark 5, 50670 Köln |
+
+**[Register Now](https://www.startplatz.de/event/vibecoding-professionals-meetup-januar-2026/)**
+
+Bring your own repo. Bring your own problem. Join the 30-minute hackathon sprint. Compare agentic coding approaches in real-time.
+
+---
+
 ## Welcome, VibeCoding Professional!
 
 You're looking at the specification for the platform we're building together. Before diving into the technical details, we recommend starting with the companion text for our introductory presentation:

@@ -263,7 +263,7 @@ Stores **atomic answers to items**, with full contextual metadata per response.
 | `user_id` | UUID | FK → users, nullable | If authenticated |
 | `role` | ENUM | NOT NULL | problem_owner, developer, coding_partner, observer, agent |
 | `time_context` | ENUM | NOT NULL | pre_meetup, pitch, review, post_meetup, late_reflection |
-| `location_context` | ENUM | NOT NULL | in_presence, remote |
+| `in_presence` | BOOLEAN | NOT NULL | TRUE = in-presence, FALSE = remote |
 | `rating_value` | INTEGER | nullable | NULL = skipped |
 | `created_at` | TIMESTAMP | NOT NULL | |
 
@@ -300,7 +300,8 @@ Canonical **event log** for all decisions, recommendations, and state transition
 - `selected_for_meetup`, `deferred_po_absent`, `deferred_low_priority`, `deferred_complexity`, `deferred_future_capability`, `dropped_low_relevance`, `dropped_insufficient_quality`
 - `opened_for_pitch_assessment`, `closed_for_pitch_assessment`
 - `opened_for_review`, `closed_for_review`
-- `recommended_acceptance`, `recommended_rejection`, `recommended_deferral`
+
+Note: There are no separate "recommendation" decision types. Bindingness is orthogonal to decision type (see Ch.10.2). An agent recommending acceptance uses `decision_type = 'accepted'` with `is_binding = false`.
 
 **Invariants**
 - Agents may only create `is_binding = false` entries
@@ -372,10 +373,6 @@ CREATE TYPE time_context AS ENUM (
   'pre_meetup', 'pitch', 'review', 'post_meetup', 'late_reflection'
 );
 
-CREATE TYPE location_context AS ENUM (
-  'in_presence', 'remote'
-);
-
 CREATE TYPE queue_state AS ENUM (
   'candidate', 'selected_for_pitch', 'selected_for_coding', 'completed'
 );
@@ -387,9 +384,9 @@ CREATE TYPE decision_type AS ENUM (
   'deferred_complexity', 'deferred_future_capability',
   'dropped_low_relevance', 'dropped_insufficient_quality',
   'opened_for_pitch_assessment', 'closed_for_pitch_assessment',
-  'opened_for_review', 'closed_for_review',
-  'recommended_acceptance', 'recommended_rejection', 'recommended_deferral'
+  'opened_for_review', 'closed_for_review'
 );
+-- Note: No 'recommended_*' types. Bindingness is orthogonal (is_binding column).
 ```
 
 ---

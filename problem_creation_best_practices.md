@@ -1,6 +1,6 @@
 # Problem Creation Best Practices
 
-This guide helps you create effective Problem Cards for the agentic coding meetup. Whether you have a polished specification or just a wild idea, there's a place for you here.
+This guide helps you create effective Problem Cards for the agentic coding meetup, tailored for professional software developers, data scientists and engineers. Whether you have a polished specification or just a wild idea, there's a place for you here.
 
 ---
 
@@ -10,10 +10,10 @@ This meetup is built on **trust and low barriers**.
 
 - **Experienced practitioners need little context** – we assume competence
 - **No long PRDs required** – unless you want precise benchmarking
-- **Moderators are here to help** – rough ideas can be shaped together
+- **Collaboration is your ally** – rough ideas can be shaped together
 - **Transparency over formality** – we learn from each other's approaches
 
-You don't need permission to experiment. You don't need a perfect specification. You need curiosity and willingness to share what you learn.
+You don't need permission to experiment. You don't need a perfect specification. You need curiosity and willingness to share what you learn. Bring your own problem *BYOP* is the core of the Meetup. Challenge your own meta reflections on how clear you present a problem. Problem Owners do not code their own problem - they watch others with their individual approaches using different platforms, agents and tools. Artifacts created in the meetup shall help everyone to improve the own productivity and quality. The platform incorporates questionaires for problem pitches and code reviews. Constistent data gathering allows for longitudinal studies and will become a data goldmine for agents we will build in later meetups. 
 
 ---
 
@@ -24,7 +24,7 @@ All of these are valid starting points:
 ### Exploratory / Wild Ideas
 - You have a hunch, an intuition, something you want to try
 - Not yet testable? That's fine
-- The problem isn't fully formed? Moderators can help refine it
+- The problem isn't fully formed? The team can help refine it
 - **This is how innovation starts**
 
 ### Minimal Viable Problem
@@ -39,7 +39,7 @@ All of these are valid starting points:
 - Reproducible environment
 - **Ideal for benchmarking different agentic tools**
 
-The more specified your problem, the easier it is to compare approaches across Cursor, Claude Code, Codex, Antigravity, or other frameworks. But don't let that stop you from submitting rough ideas.
+The more specified your problem, the easier it is to compare approaches across Cursor, Claude Code, Codex, Antigravity, or other frameworks. But don't let that stop you from submitting rough ideas. Meetup participants who selected your problem sit next to you or are in a breakout room you arrange for them. While answering open questions you get a good feedback what you forgot to clarify upfront.
 
 ---
 
@@ -52,7 +52,7 @@ Fresh start, no existing code constraints.
 - Most agentic tools excel here
 
 ### Advanced Greenfield
-New project but with integration requirements.
+Some greenfield code and auxiliary artifacts already exist
 - APIs, external services, architectural decisions
 - Requires more context in the problem description
 - **Growing capability** of the meetup community
@@ -64,42 +64,50 @@ Existing codebase, legacy constraints, real-world messiness.
 - The meetup **aims to tackle these** as we collectively improve
 - If you have a brownfield problem, bring it – we'll learn together
 
-**Our vision**: The community grows together to solve increasingly complex problems. Today's impossible brownfield challenge becomes next year's solved pattern.
+**Our vision**: The community grows together to solve increasingly complex problems. Today's impossible brownfield challenge becomes next year's solved pattern. Important artifacts can be improved over multiple meetups.
 
 ---
 
-## 4. Writing Your Problem Description
+## 4. Writing Your Problem Card
 
-Keep it focused. Pros can fill in the gaps.
+A **Problem Card** describes the challenge you bring to the meetup.  
+It does not need to be perfect — it needs to be **clear enough to evaluate and compare**.
 
-**Essential elements:**
-- **What's the core challenge?** (1-2 sentences)
-- **Why does it matter?** (motivation, context)
-- **What would "done" look like?** (flexible definition OK)
+### Required fields
 
-**Optional but helpful:**
-- Constraints or non-goals
-- Links to relevant documentation
-- Known edge cases
+- **Title**  
+  Short, descriptive name of the problem.
 
-**Example (minimal):**
-> Build a CLI tool that converts markdown files to a static blog. Should support front matter for metadata and generate an index page.
+- **Problem description**  
+  What is the core challenge? Keep it brief (2–5 sentences).
 
-**Example (well-specified):**
-> Build a CLI tool that converts markdown files to a static blog.
->
-> Requirements:
-> - Parse YAML front matter (title, date, tags)
-> - Generate HTML with syntax highlighting for code blocks
-> - Create index.html listing all posts by date
-> - Support --watch mode for development
->
-> Test cases:
-> - Single post with code block renders correctly
-> - Multiple posts sorted by date on index
-> - Missing front matter uses filename as title
+- **Why it matters**  
+  Why is this problem interesting, useful, or worth solving?
 
-Both are valid. The second enables better comparison across tools.
+- **Repository URL (GitHub)**  
+  The main repository participants will work with.
+
+- **Problem type**  
+  One of:
+  - Explorative  
+  - Greenfield (Early)  
+  - Greenfield (Advanced)  
+  - Brownfield  
+
+- **Task structure (number)**  
+  If your problem is monolithic, try to break it down to prioritized sub-tasks or tickets. This makes it easier to compare partial solutions.
+
+### Optional but helpful
+
+- Constraints or non-goals    
+- Links to docs, demos, or issues  
+- Notes and test cases on how success could be judged
+
+### Versioning note
+
+Once submitted, your Problem Card is locked. 
+If you improve the description or the repository later, create a **new version**.  
+Older versions stay visible for comparison.
 
 ---
 
@@ -107,7 +115,7 @@ Both are valid. The second enables better comparison across tools.
 
 **Minimal** (always required):
 - Working GitHub repository link
-- Code is accessible (public, or instructions for private repos)
+- Requirements and code are accessible to the public
 
 **Better**:
 - README with setup instructions
@@ -184,10 +192,10 @@ If your goal is to explore an idea, don't force a detailed spec. You'll constrai
 If you want to compare tools fairly, vague requirements lead to incomparable solutions.
 
 ### Forgetting to save your private URL
-The private URL is your edit key. Bookmark it. We also send it to your email, but save it somewhere safe.
+The private URL is your edit key to the Problem Card. Bookmark it. We also send it to your email, but save it somewhere safe.
 
 ### Waiting for the "perfect" problem
-Submit the rough idea. Moderators and the community can help shape it. Perfect is the enemy of interesting.
+Submit the rough idea. The community can help shape it. Perfect is the enemy of interesting.
 
 ### Not documenting your tooling
 Your PR teaches others nothing if it's just code. The journey matters as much as the destination.

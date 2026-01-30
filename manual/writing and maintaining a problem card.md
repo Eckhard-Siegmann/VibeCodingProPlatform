@@ -35,37 +35,33 @@ A Problem Card is **not**:
 
 Each **major version** of a Problem Card contains structured fields stored explicitly in the database. These fields are locked once submitted and only change via creation of a new major version.
 
-**Required fields**
-- **Title**  
+**Required fields** (per Chapter 19 data model)
+
+- **title**
   A concise, human-readable name for the problem.
 
-- **Problem Description**  
+- **description**
   A short but clear explanation of the challenge. This should be understandable without opening the repository.
 
-- **Motivation / Value Statement**  
-  Why this problem matters. This is explicitly used in later evaluations of *business value* and *general relevance*.
+- **repo_url_primary**
+  The canonical GitHub repository associated with this problem.
+  The platform records the **HEAD commit hash** when a new version is created (via `problem_repo_snapshots`).
 
-- **Primary Repository URL (GitHub)**  
-  The canonical GitHub repository associated with this problem.  
-  The platform records the **HEAD commit hash** when a new version is created.
-
-- **Problem Type**  
-  One of:
-  - Explorative
-  - Greenfield (Early)
-  - Greenfield (Advanced)
-  - Brownfield
-
-- **Task Structure Indicator**  
-  A single integer:
+- **task_count**
+  A positive integer (>= 1):
   - `1` = monolithic task
   - `>1` = number of independently solvable sub-tasks (tickets)
 
-**Optional but strongly recommended**
-- **Secondary URL** (e.g. docs, demo, issue tracker)
-- **Constraints / Non-goals**
-- **Known risks or ambiguities**
-- **Hints on testability or evaluation**
+**Optional fields**
+
+- **value_statement**
+  Why this problem matters. Used in evaluations of *business value* and *general relevance*.
+
+- **repo_url_secondary**
+  Additional URL (e.g. docs, demo, issue tracker).
+
+- **commit_message**
+  Change description when creating a new major version (similar to a git commit message).
 
 ---
 
@@ -107,20 +103,26 @@ A flexible definition of “done” is acceptable **as long as it is stated**.
 
 ### 4.5 Versioning Rules You Must Understand
 
-- Drafts (version 0) are **not persisted** as versions.
+**Major versions** (stored in `problem_versions`):
 - The first submission creates **major version 1**.
 - Any later modification requires **creating a new major version**.
-- Only **one major version is current** at any time.
+- Only **one major version is current** at any time (`is_current = true`).
 - Older versions remain visible and assessable in archive view.
 - Rollback is implemented by promoting an older version to a new major version.
 
 Each major version stores:
-- the textual fields
-- the GitHub HEAD commit hash at creation time
-- an optional change comment (similar to a commit message)
+- the textual fields (title, description, value_statement)
+- repository URLs (repo_url_primary, repo_url_secondary)
+- task_count
+- an optional commit_message (change description)
+
+**Minor versions** (stored in `problem_repo_snapshots`):
+- Track repository drift via HEAD commit hashes
+- Auto-assigned within each major version
+- Enable filtering assessments by exact repository state
 
 This allows longitudinal analysis such as:
-> “Version 1 was rejected for clarity; version 2 was accepted.”
+> "Version 1 was rejected for clarity; version 2 was accepted."
 
 ---
 
@@ -146,42 +148,39 @@ Instead, aim for clarity so *different inventories can extract signal*.
 ### 4.7 Examples (Contextualized)
 
 **Minimal but valid**
-> Title: Markdown-to-Blog CLI  
->  
-> Description: Convert Markdown files into a static blog.  
->  
-> Motivation: Useful baseline task to compare agentic coding workflows.  
->  
-> Repository: https://github.com/example/md-blog  
->  
-> Problem Type: Greenfield (Early)  
-> Task Structure: 1
+> title: Markdown-to-Blog CLI
+>
+> description: Convert Markdown files into a static blog.
+>
+> value_statement: Useful baseline task to compare agentic coding workflows.
+>
+> repo_url_primary: https://github.com/example/md-blog
+>
+> task_count: 1
 
 **Well-structured and highly assessable**
-> Title: Markdown-to-Blog CLI  
->  
-> Description: Build a CLI tool that converts Markdown files into a static blog.  
->  
-> Motivation: Enables comparison of agentic approaches for parsing, code generation, and incremental refinement.  
->  
-> Repository: https://github.com/example/md-blog  
->  
-> Problem Type: Greenfield (Advanced)  
-> Task Structure: 4  
->  
-> Subtasks (implicit via task structure):
-> - Parse YAML front matter  
-> - Render Markdown with syntax highlighting  
-> - Generate index page  
-> - Implement watch mode  
->  
+> title: Markdown-to-Blog CLI
+>
+> description: Build a CLI tool that converts Markdown files into a static blog.
+> Subtasks (reflected in task_count):
+> - Parse YAML front matter
+> - Render Markdown with syntax highlighting
+> - Generate index page
+> - Implement watch mode
+>
 > Constraints:
-> - CLI-only, no web UI  
-> - Focus on readability over performance  
->  
+> - CLI-only, no web UI
+> - Focus on readability over performance
+>
 > Testability:
-> - Example Markdown inputs provided  
+> - Example Markdown inputs provided
 > - Expected HTML outputs defined
+>
+> value_statement: Enables comparison of agentic approaches for parsing, code generation, and incremental refinement.
+>
+> repo_url_primary: https://github.com/example/md-blog
+>
+> task_count: 4
 
 Both are acceptable.  
 The second simply enables **richer comparison and learning**.

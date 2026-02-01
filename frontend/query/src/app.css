@@ -1,0 +1,65 @@
+@import 'tailwindcss';
+
+/* Style Guide Color Tokens */
+@theme {
+  /* Backgrounds */
+  --color-viewport: #DCEBFF;
+  --color-canvas: #F1F2F8;
+  --color-card: #FEFEFE;
+
+  /* Typography */
+  --color-headers: #192A4B;
+  --color-labels: #7B7C90;
+  --color-meta: #7F91AF;
+
+  /* Primary Accent */
+  --color-primary: #2680F1;
+  --color-primary-hover: #2A87F7;
+
+  /* Separators (Etched Effect) */
+  --color-etch-top: #EDEEF5;
+  --color-etch-bottom: #EFF1F5;
+
+  /* Secondary */
+  --color-secondary: #DCE4EA;
+  --color-secondary-dark: #BEC8DD;
+
+  /* Status */
+  --color-success: #55B368;
+  --color-alert: #D95A5C;
+  --color-pending: #EAB308;
+
+  /* Icons */
+  --color-icon: #455878;
+
+  /* Border Radius */
+  --radius-card: 12px;
+  --radius-card-lg: 16px;
+
+  /* Shadows */
+  --shadow-card: 0px 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-floating: 0px 20px 40px rgba(127, 145, 175, 0.15);
+}
+
+/* Focus ring for accessibility */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Base typography */
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--color-headers);
+  background-color: var(--color-viewport);
+}

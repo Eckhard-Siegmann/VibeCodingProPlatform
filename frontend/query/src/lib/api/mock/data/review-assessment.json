@@ -1,0 +1,112 @@
+{
+	"assessment_id": "review-001",
+	"problem_id": "prob-123",
+	"problem_title": "AI-Powered Code Review Assistant",
+	"inventory_key": "review_assessment",
+	"inventory_name": "Review - Post-Sprint Evaluation",
+	"time_context": "review",
+	"render_type": "single_matrix",
+	"is_open": true,
+	"matrix": {
+		"max_rating": 5,
+		"common_headers": [
+			{ "rating_value": 1, "label": "Poor" },
+			{ "rating_value": 2, "label": "Fair" },
+			{ "rating_value": 3, "label": "Good" },
+			{ "rating_value": 4, "label": "Very Good" },
+			{ "rating_value": 5, "label": "Excellent" }
+		],
+		"rows": [
+			{
+				"position_index": 1,
+				"item_id": "0d2b6f6a-28c3-4d8b-9af6-3f9f9f6c4d01",
+				"item_key": "correctness",
+				"short_label": "Correctness",
+				"full_text": "Correctness: The solution meets the stated requirements (including edge cases) and behaves as intended.",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 2,
+				"item_id": "8fa2e7a2-0e0a-4c6d-b8db-7b7a0c7e0a02",
+				"item_key": "test_support",
+				"short_label": "Test Support",
+				"full_text": "Test support: Evidence (tests or equivalent checks) convincingly supports correctness.",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 3,
+				"item_id": "c03a7f23-56df-4b65-a0a6-4b2a62fb0a03",
+				"item_key": "code_readability",
+				"short_label": "Readability",
+				"full_text": "Readability: The code is easy to read and understand (naming, structure, local reasoning).",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 4,
+				"item_id": "7e51a8e5-2f7a-46b1-9a0e-85f8b7f48a04",
+				"item_key": "simplicity",
+				"short_label": "Simplicity",
+				"full_text": "Simplicity: The solution avoids unnecessary complexity and bloat.",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 5,
+				"item_id": "b0f1c2c6-9f5e-43ff-9d1d-3f1e884b2a05",
+				"item_key": "elegance",
+				"short_label": "Elegance",
+				"full_text": "Elegance: The solution uses fitting language constructs and exhibits a clean, teachable structure.",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 6,
+				"item_id": "f6a94c2a-3a63-4cc3-9e4e-fc46c4c1aa06",
+				"item_key": "extensibility",
+				"short_label": "Extensibility",
+				"full_text": "Extensibility: The design can accommodate likely requirement changes with minimal rework (without overengineering).",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 7,
+				"item_id": "1c88d55b-3d2d-4d2d-9f1b-6f27c5f80b07",
+				"item_key": "completion_degree",
+				"short_label": "Completion",
+				"full_text": "Completion: How much of the intended task scope was achieved.",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 8,
+				"item_id": "a54c2b9a-6f30-4a9c-a1d1-4bd33f6e6a08",
+				"item_key": "time_efficiency",
+				"short_label": "Time Efficiency",
+				"full_text": "Time efficiency: Given the time constraints, the approach produced strong progress per unit time.",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 9,
+				"item_id": "d0fb0c0f-4f2e-4d2a-9f52-8fda13b7aa09",
+				"item_key": "cognitive_ease",
+				"short_label": "Cognitive Ease",
+				"full_text": "Cognitive Ease: How would you rate the cognitive ease of understanding and supervising this process?",
+				"max_rating": 5,
+				"current_rating": null
+			},
+			{
+				"position_index": 10,
+				"item_id": "0b7a9c2d-6d3e-4c2a-9a1f-3b7c9d1daa18",
+				"item_key": "engagement_intensity",
+				"short_label": "Engagement",
+				"full_text": "Engagement: How intensively did you engage with this problem or solution before rating?",
+				"max_rating": 5,
+				"current_rating": null
+			}
+		]
+	}
+}

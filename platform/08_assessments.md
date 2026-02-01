@@ -29,11 +29,40 @@ The system does not enforce which Inventories may be used in which situations. T
 
 ---
 
-## 8.2 Assessment Contexts (Pre-Meetup, Pitch, Review, Post-Meetup)
+## 8.2 Unified Scale Impact on Assessment Rendering
+
+All items in the current system are standardized to **max_rating=5** with uniform labels (Poor, Fair, Good, Very Good, Excellent) to optimize cognitive efficiency during live assessments.
+
+When an Assessment is retrieved for rendering, the **backend** performs scale consistency checking:
+
+1. **Fetch** all items in the inventory (resolved to active versions)
+2. **Check** scale consistency: Do all items share identical max_rating and labels?
+3. **Return** a render-ready JSON structure describing how to display the assessment
+
+**If consistent** (MVP case): A single matrix with common column headers
+```
+Item 1    | Poor | Fair | Good | Very Good | Excellent
+Item 2    | ☐    | ☐    | ☐    | ☐         | ☐
+Item 3    | ☐    | ☐    | ☐    | ☐         | ☐
+...       |      |      |      |           |
+```
+
+**If inconsistent** (future): Multiple sections, each with appropriate render mode
+```
+[Quality Assessment - 5 point matrix]
+[Cognitive Load - 7 point slider]
+[Binary decision - Yes/No choice]
+```
+
+The frontend is a **stateless renderer** that receives the prepared structure and renders accordingly—no scale logic needed.
+
+---
+
+## 8.3 Assessment Contexts (Pre-Meetup, Pitch, Review, Post-Meetup)
 
 Every Assessment is contextualized along a **time-related dimension** that situates it within the lifecycle of a Problem and a meetup.
 
-Commonly used contexts include:
+Commonly used contexts include (per Chapter 9.5 after reorganization):
 
 - **Pre-Meetup**  
   Assessments conducted before a meetup takes place. These often include self-assessments by Problem Owners, moderator quality gates, or agent-based pre-reviews.
@@ -63,8 +92,8 @@ A key element is **engagement intensity**: a self-reported measure of how deeply
 
 Further contextual metadata includes:
 
-- **Role at the time of assessment**  
-  (e.g. Problem Owner, Developer, Observer, Moderator, Agent)
+- **Role at the time of assessment**
+  (one of seven roles: `observer`, `developer`, `coding_partner`, `problem_owner`, `moderator`, `admin`, `agent`)
 
 - **Participation mode**  
   (in-presence vs. remote)

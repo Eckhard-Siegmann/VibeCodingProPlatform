@@ -3,19 +3,20 @@ Human-readable pre-population set (to be translated into SQL INSERTs later).
 Assumes the latest schema:
 - `items` are immutable versions referenced by `item_id` (UUID) and stable `item_key`
 - `inventories` reference `item_key` via `inventory_items`
-- Allowed `max_rating`: 1, 2, 3, 5, 7, 10
+- **All items use unified max_rating=5** for cognitive consistency in live assessments
 - Labels are stored in: label_min, label_low_mid, label_mid, label_high_mid, label_max
-- Conventions used here:
-  - max_rating=5 for most Likert items (fully verbalized)
-  - max_rating=10 only where fine-grained “slider-like” resolution is beneficial (extremes labeled)
+- Convention: All items use all five labels (Poor, Fair, Good, Very Good, Excellent)
+- **Future expansion**: If evaluation data reveals insufficient granularity, items can migrate to
+  slider format (0-100 continuous) or other scales without schema changes. The backend's
+  scale consistency checker will automatically group items by scale and render appropriately.
 
 ---
 
 ## 1) Items (insert into `items`)
 
 ### Scale label conventions used below
-- For max_rating=5: all five labels are set
-- For max_rating=10: only label_min and label_max are set (others NULL)
+- All items: max_rating=5, all five labels fully verbalized
+- No NULL labels in the label set
 
 > All `retired_at` = NULL (active).  
 > All IDs below are unique UUIDs (example values).
@@ -117,13 +118,20 @@ Assumes the latest schema:
   label_max: "Exceptional progress"
 
 - item_id: **d0fb0c0f-4f2e-4d2a-9f52-8fda13b7aa09**
-  item_key: **cognitive_load**
+  item_key: **cognitive_ease**
   item_category: human_factors
-  max_rating: **10**
-  prompt_text: "Mental load: How mentally demanding was it to follow, supervise, and validate the process?"
-  label_min: "Very low load"
-  label_max: "Extremely high load"
-  (label_low_mid/label_mid/label_high_mid: NULL)
+  max_rating: **5**
+  prompt_text: "Cognitive Ease: How would you rate the cognitive ease of understanding and supervising this process?"
+  label_min: "Poor (very demanding)"
+  label_low_mid: "Fair (somewhat demanding)"
+  label_mid: "Good (moderately easy)"
+  label_high_mid: "Very Good (quite easy)"
+  label_max: "Excellent (effortless)"
+
+  NOTE: Polarity has been inverted from the original "cognitive_load" item.
+  Rather than measuring "load" (higher = worse), we now measure "ease" (higher = better).
+  This maintains semantic equivalence while aligning with the unified 5-point scale where
+  higher values always indicate "more" of the measured construct.
 
 ---
 

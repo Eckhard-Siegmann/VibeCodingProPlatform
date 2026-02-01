@@ -106,11 +106,44 @@ For moderators and administrators, authenticated accounts exist, but **these ide
 
 ---
 
-## 9.4 Context Orthogonalization (Role, Time, Location)
+## 9.4 Backend-Prepared Assessment Render Structures
+
+The system does not expose raw items or scale details directly to the frontend.
+Instead, the backend performs scale consistency validation and returns a single, render-ready JSON object.
+
+### Scale Consistency Validation
+
+Before rendering an Assessment, the backend:
+1. Fetches all items in the inventory (with active versions)
+2. Extracts the scale signature from each item (max_rating + label set)
+3. Groups items by scale signature
+4. Determines render strategy based on consistency
+
+### Render Types
+
+**single_matrix** (MVP): All items share identical scale
+- Returns one matrix with common column headers and all items as rows
+- Minimal cognitive overhead for evaluators
+
+**mixed_matrices** (Future): Items have heterogeneous scales
+- Returns multiple sections, each with its own render mode
+- Sections may use different scales: traditional matrix (5-point), slider (continuous), binary choice, etc.
+- Frontend renders each section according to its `render_mode`
+
+### Benefits of Backend Ownership
+
+- **Scale logic is centralized**: All validation happens once at the backend
+- **Frontend is stateless**: Receives structured data, performs no conditionals beyond layout
+- **Future-proof**: New scales (7-point, slider, binary) automatically supported
+- **Testable**: Backend logic can be unit-tested independently
+
+---
+
+## 9.6 Context Orthogonalization (Role, Time, Location)
 
 Every atomic vote is contextualized along a set of **orthogonal dimensions**. These dimensions are recorded explicitly and independently, rather than inferred from surrounding state.
 
-### Role Context
+### 9.6.1 Role Context
 
 Each vote is associated with exactly one role at the time of voting, such as:
 
@@ -124,7 +157,7 @@ Roles are self-declared per assessment context and are not assumed to be stable 
 
 ---
 
-### Time Context
+### 9.6.2 Time Context
 
 Votes are tagged with a discrete **time context**, representing their position in the meetup lifecycle, for example:
 
@@ -140,7 +173,7 @@ This allows fine-grained temporal analysis without relying solely on timestamps,
 
 ---
 
-### Location Context
+### 9.6.3 Location Context
 
 Each session declares a stable **location context**:
 
@@ -151,7 +184,7 @@ This flag is captured once per session and applied consistently to all votes fro
 
 ---
 
-### Orthogonality as a Design Invariant
+### 9.6.4 Orthogonality as a Design Invariant
 
 None of these contextual dimensions imply or constrain the others:
 
@@ -168,3 +201,5 @@ This orthogonal design ensures that:
 ---
 
 Together, the mechanisms described in this chapter ensure that voting data is **precise, minimal, interpretable, and analytically powerful**, forming a solid empirical foundation for everything built on top of it.
+
+The backend-prepared render structures ensure that evaluators always see **optimally-formatted assessments** regardless of scale heterogeneity, while the frontend remains focused purely on presentation.

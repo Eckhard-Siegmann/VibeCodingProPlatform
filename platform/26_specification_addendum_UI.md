@@ -82,9 +82,138 @@ Research basis:
 
 ---
 
-## 26.4 Button Scale Requirements
+## 26.4 Backend-Prepared Assessment Render Structure
 
-### 26.4.1 Button Scale Interaction States
+**NEW: Backend owns all scale logic and consistency checking. Frontend is a stateless renderer.**
+
+### 26.4.1 Assessment Render Endpoint
+
+The frontend does **not** fetch raw items. Instead, it calls:
+
+```
+GET /api/assessments/{assessmentId}/render-structure
+```
+
+**Response Structure (MVP: all items same scale):**
+```json
+{
+  "assessment_id": "abc-123",
+  "inventory_key": "review_assessment",
+  "render_type": "single_matrix",
+  "matrix": {
+    "max_rating": 5,
+    "common_headers": [
+      { "rating_value": 1, "label": "Poor" },
+      { "rating_value": 2, "label": "Fair" },
+      { "rating_value": 3, "label": "Good" },
+      { "rating_value": 4, "label": "Very Good" },
+      { "rating_value": 5, "label": "Excellent" }
+    ],
+    "rows": [
+      {
+        "position_index": 1,
+        "item_id": "uuid-1",
+        "item_key": "correctness",
+        "short_label": "Correctness",
+        "full_text": "How would you rate the correctness of this solution?",
+        "max_rating": 5,
+        "current_rating": null
+      },
+      // ... 17 more items (all 18 items with max_rating=5)
+    ]
+  }
+}
+```
+
+**Response Structure (Future: mixed scales):**
+```json
+{
+  "assessment_id": "abc-456",
+  "inventory_key": "review_assessment_v2",
+  "render_type": "mixed_matrices",
+  "matrices": [
+    {
+      "description": "Quality Assessment (5-point)",
+      "render_mode": "matrix",
+      "max_rating": 5,
+      "common_headers": [...],
+      "rows": [/* 17 items with max_rating=5 */]
+    },
+    {
+      "description": "Cognitive Load (slider)",
+      "render_mode": "slider",
+      "max_rating": 7,
+      "common_headers": [
+        { "rating_value": 1, "label": "Very demanding" },
+        { "rating_value": 4, "label": "Neutral" },
+        { "rating_value": 7, "label": "Effortless" }
+      ],
+      "rows": [
+        {
+          "position_index": 9,
+          "item_id": "uuid-9-v2",
+          "item_key": "cognitive_ease",
+          "short_label": "Cognitive Ease",
+          "max_rating": 7,
+          "current_rating": null
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 26.4.2 Backend Scale Consistency Logic
+
+The backend:
+1. Fetches all items in the inventory (with active versions only)
+2. Extracts scale signature from each: `(max_rating, label_min, label_low_mid, label_mid, label_high_mid, label_max)`
+3. Groups items by signature
+4. Returns a single JSON object describing the render strategy
+
+**If all items have identical scale**: `render_type: "single_matrix"` → Frontend renders one table
+**If items have different scales**: `render_type: "mixed_matrices"` → Frontend renders multiple sections
+
+### 26.4.3 Frontend Rendering (Stateless)
+
+```svelte
+<!-- AssessmentForm.svelte -->
+<script>
+  let structure = await fetch(`/api/assessments/${assessmentId}/render-structure`)
+    .then(r => r.json());
+</script>
+
+{#if structure.render_type === 'single_matrix'}
+  <MatrixTable matrix={structure.matrix} />
+{:else if structure.render_type === 'mixed_matrices'}
+  <div>
+    {#each structure.matrices as matrix}
+      {#if matrix.render_mode === 'matrix'}
+        <MatrixTable {matrix} />
+      {:else if matrix.render_mode === 'slider'}
+        <SliderSection {matrix} />
+      {:else if matrix.render_mode === 'binary_choice'}
+        <BinaryChoiceSection {matrix} />
+      {/if}
+    {/each}
+  </div>
+{/if}
+```
+
+The frontend contains **no scale logic**—only conditional rendering based on `render_mode`.
+
+### 26.4.4 Benefits
+
+- **Scale consistency validated once at backend** → No repeated checks in UI
+- **Frontend is dumb** → No business logic, just presentation
+- **Future scales automatic** → New scale (7-point, slider, binary) automatically supported
+- **Clean API** → One endpoint returns everything needed for one assessment
+
+---
+
+## 26.5 Button Scale Requirements
+
+### 26.5.1 Button Scale Interaction States
 
 | State | Visual Appearance | Data State |
 |-------|-------------------|------------|
@@ -92,7 +221,7 @@ Research basis:
 | **Selected** | One button filled/highlighted | Integer value stored |
 | **Changed** | Previous deselects, new selects | Supersedes previous |
 
-### 26.4.2 Label Display
+### 26.5.2 Label Display
 
 | `max_rating` | Label Strategy |
 |--------------|----------------|
@@ -102,16 +231,16 @@ Research basis:
 
 ---
 
-## 26.5 Accessibility Requirements
+## 26.6 Accessibility Requirements
 
-### 26.5.1 Touch Targets
+### 26.6.1 Touch Targets
 
 | Requirement | Specification | Source |
 |-------------|---------------|--------|
 | Minimum size | 44×44 CSS pixels | WCAG 2.1 Target Size |
 | Minimum gap | 16px between adjacent buttons | UX best practice |
 
-### 26.5.2 Keyboard Navigation
+### 26.6.2 Keyboard Navigation
 
 **Button Scale:**
 - `Tab`: Focus next/previous item
@@ -124,7 +253,7 @@ Research basis:
 - `End`: Jump to maximum
 - `Tab`: Focus next/previous item
 
-### 26.5.3 ARIA Requirements
+### 26.6.3 ARIA Requirements
 
 **Button Scale:**
 ```html
@@ -154,7 +283,7 @@ Where `valueText` provides semantic context:
 - 4-6: "Medium"
 - 7-10: "High"
 
-### 26.5.4 Visual Requirements
+### 26.6.4 Visual Requirements
 
 | Requirement | Specification |
 |-------------|---------------|
@@ -164,9 +293,9 @@ Where `valueText` provides semantic context:
 
 ---
 
-## 26.6 Responsive Layout Requirements
+## 26.7 Responsive Layout Requirements
 
-### 26.6.1 Breakpoints
+### 26.7.1 Breakpoints
 
 | Breakpoint | Width | Layout Strategy |
 |------------|-------|-----------------|
@@ -175,7 +304,7 @@ Where `valueText` provides semantic context:
 | `md` | ≥ 768px | Side-by-side label + control |
 | `lg` | ≥ 1024px | Multi-column overview possible |
 
-### 26.6.2 Mobile Layout (< 640px)
+### 26.7.2 Mobile Layout (< 640px)
 
 **Button Scale (5-point example):**
 ```
@@ -222,7 +351,7 @@ Where `valueText` provides semantic context:
 - Endpoint labels above or beside track
 - Sufficient padding for thumb manipulation
 
-### 26.6.3 Desktop Layout (≥ 768px)
+### 26.7.3 Desktop Layout (≥ 768px)
 
 **Button Scale (5-point example):**
 ```
@@ -255,7 +384,7 @@ Where `valueText` provides semantic context:
 
 ---
 
-## 26.7 Tech Stack Decision
+## 26.8 Tech Stack Decision
 
 **Decision: SvelteKit 2.x + Tailwind CSS 4.x**
 
@@ -270,7 +399,7 @@ This updates the tech stack decision from Chapter 25 (Next.js 14 + shadcn/ui) ba
 | Database | SQLite (dev) → PostgreSQL (prod) | Per Chapter 25 |
 | ORM | **Drizzle** or **Kysely** | Type-safe queries, works with both databases |
 
-### 26.7.1 Component Architecture
+### 26.8.1 Component Architecture
 
 ```
 src/lib/components/
@@ -288,7 +417,7 @@ src/lib/components/
     └── Card.svelte
 ```
 
-### 26.7.2 Scale Selection Logic
+### 26.8.2 Scale Selection Logic
 
 ```svelte
 <!-- RatingItem.svelte -->
@@ -301,7 +430,7 @@ src/lib/components/
 
 ---
 
-## 26.8 Data Flow
+## 26.9 Data Flow
 
 1. **Render**: Fetch inventory → items via `item_key` → resolve to active `item_id`
 2. **Capture**: User interacts → local Svelte store updates
@@ -310,7 +439,7 @@ src/lib/components/
 
 ---
 
-## 26.9 Open Considerations
+## 26.10 Open Considerations
 
 | Topic | Status | Notes |
 |-------|--------|-------|

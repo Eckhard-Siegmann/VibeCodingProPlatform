@@ -99,31 +99,44 @@ This hybrid ensures:
 All quantitative evaluations are encoded as **integer ratings**.  
 There are no free-form categorical responses and no floating-point scales.
 
-### Supported Scale Sizes
+### Supported Scale Sizes (Initial Release)
 
-The system supports the following scale sizes:
+The system currently standardizes on:
 
-- **1** (binary / presence indicator)
-- **2**
-- **3**
-- **5**
-- **7**
-- **10**
+- **5** (Likert: Poor, Fair, Good, Very Good, Excellent)
 
-The scale size is defined per Item via `max_rating`.
+All items use a unified 5-point scale to minimize cognitive load for evaluators while maintaining semantic clarity across all evaluation contexts.
+
+### Future: Scale Expansion Path
+
+If longitudinal evaluation data reveals insufficient granularity (measured via signal-to-noise ratio, inter-rater agreement, or variance analysis), items can migrate to alternative scales:
+
+- **Continuous slider** (0-100): For dimensions requiring finer granularity
+- **7-point Likert**: For expanded categorical distinctions
+- **Binary/ternary scales**: For high-stakes binary decisions
+- **Other scales**: Extensible without schema changes
+
+Migration occurs by creating a new Item version with the same `item_key` but different `max_rating` and labels. Historical assessments remain valid (tied to old `item_id`), and the inventory automatically uses the new active version. The backend's scale consistency checker determines rendering strategy (see Section 7.5).
 
 ### Labeling Semantics
 
-Label availability depends on scale size:
+### Label Availability (5-Point Scale)
 
-- **1**  
-  - `mid_label`
-- **2, 10**  
-  - `min_label`, `max_label`
-- **3, 7**  
-  - `min_label`, `mid_label`, `max_label`
-- **5**  
-  - `min_label`, `low_mid_label`, `mid_label`, `high_mid_label`, `max_label`
+All items use exactly five labels:
+- `label_min` (Poor)
+- `label_low_mid` (Fair)
+- `label_mid` (Good)
+- `label_high_mid` (Very Good)
+- `label_max` (Excellent)
+
+This unified labeling reduces cognitive overhead for evaluators while preserving semantic granularity.
+
+### Labels for Alternative Scales (Future)
+
+If items migrate to alternative scales:
+- **Slider (0-100)**: Only `label_min` and `label_max` set; others NULL
+- **7-point Likert**: All seven positions labeled (or only extremes + mid)
+- **Binary (2-point)**: `label_min` and `label_max` only
 
 Labels are part of the Item definition and therefore immutable.
 
@@ -149,7 +162,83 @@ Reverse-coded or ambiguous scales are intentionally excluded.
 
 ---
 
-## 7.4 Inventory Composition and Ordering
+## 7.4 Scale Consistency and Backend-Prepared Render Structures
+
+When an Assessment is requested (applying an Inventory to a Problem), the backend performs a critical validation step:
+
+### Scale Consistency Checking
+
+The backend checks whether all items in the inventory share identical scale properties:
+- Same `max_rating`
+- Same label set (`label_min`, `label_low_mid`, `label_mid`, `label_high_mid`, `label_max`)
+
+**If consistent**: All items can be rendered in a single matrix with common column headers.
+**If inconsistent**: Items are grouped by scale and rendered in multiple sections or with individual labels.
+
+### Backend Endpoint: GET /assessments/{assessmentId}/render-structure
+
+The backend does NOT expose raw items to the frontend. Instead, it returns a single, render-ready JSON object:
+
+```json
+{
+  "render_type": "single_matrix" | "mixed_matrices",
+  "matrix": {
+    "max_rating": 5,
+    "common_headers": [
+      {"rating_value": 1, "label": "Poor"},
+      {"rating_value": 2, "label": "Fair"},
+      ...
+    ],
+    "rows": [
+      {
+        "item_id": "uuid",
+        "item_key": "correctness",
+        "short_label": "Correctness",
+        "max_rating": 5,
+        "current_rating": null
+      },
+      ...
+    ]
+  }
+}
+```
+
+Or for mixed scales:
+
+```json
+{
+  "render_type": "mixed_matrices",
+  "matrices": [
+    {
+      "description": "Quality Assessment (5-point)",
+      "render_mode": "matrix",
+      "rows": [...]
+    },
+    {
+      "description": "Cognitive Load (slider)",
+      "render_mode": "slider",
+      "rows": [...]
+    }
+  ]
+}
+```
+
+### Frontend Rendering
+
+The frontend is a stateless renderer that:
+- Fetches the render structure
+- Renders the appropriate UI based on `render_type` and `render_mode`
+- Contains no scale logic or validation
+
+This separation ensures:
+- Scale consistency is validated once at the backend
+- The frontend has no rendering conditionals beyond layout
+- New scales (7-point, slider, binary) can be added without frontend changes
+- Future scale migrations are transparent to the UI
+
+---
+
+## 7.5 Inventory Composition and Ordering
 
 Inventories are **explicitly ordered** sequences of Items.
 

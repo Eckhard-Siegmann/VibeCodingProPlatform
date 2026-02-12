@@ -37,6 +37,12 @@ This repository contains the complete specification for the **VibeCoding Profess
 
 The platform embodies our core philosophy: **Pros for Pros**. Low barriers to entry, high trust, real problems, measurable quality.
 
+### Domain Model at a Glance
+
+![VibeCoding Domain Model](images/01-domain-model-hero.png)
+
+*Six core entities with immutable decision audit trail — the conceptual backbone of the platform.*
+
 ---
 
 ## Specification Overview
@@ -99,6 +105,12 @@ The specification is organized into numbered chapters:
 **Decisions** are the single source of truth. Every state change is recorded with attribution, timestamp, and rationale.
 
 **Immutability** is a core principle. Historical records are never modified. Changes create new versions.
+
+### Who Does What?
+
+![Role Authority Matrix](images/05-role-authority-matrix.png)
+
+*The platform separates binding authority (Moderator/Admin) from evaluation participation (all roles).*
 
 ---
 

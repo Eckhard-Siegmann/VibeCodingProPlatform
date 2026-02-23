@@ -1,6 +1,4 @@
 <script lang="ts">
-	import Card from '$lib/components/ui/Card.svelte';
-
 	type Role = 'problem_owner' | 'developer' | 'observer';
 
 	interface Props {

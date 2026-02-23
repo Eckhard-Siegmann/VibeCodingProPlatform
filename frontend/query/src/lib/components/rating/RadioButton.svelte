@@ -37,7 +37,7 @@
 		rounded-lg transition-colors cursor-pointer
 		hover:bg-primary/5 focus-visible:bg-primary/5
 		disabled:opacity-50 disabled:cursor-not-allowed
-		md:flex-col md:items-center md:justify-center md:gap-1 md:px-2 md:py-3"
+		md:flex-1 md:flex-col md:items-center md:justify-center md:gap-1 md:px-1 md:py-3"
 >
 	<!-- Radio circle -->
 	<span
@@ -54,8 +54,10 @@
 
 	<!-- Label -->
 	<span
-		class="text-sm text-labels group-hover:text-headers transition-colors
+		class="text-sm text-labels group-hover:text-headers transition-colors text-center
+			md:text-xs md:truncate md:w-full
 			{checked ? 'text-headers font-medium' : ''}"
+		title={label}
 	>
 		{label}
 	</span>

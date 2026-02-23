@@ -4,31 +4,33 @@ This chapter defines the foundational intent and framing of the system. It clari
 
 ## 1.1 Purpose of the System
 
-The system is designed to make **agentic code generation, evaluation, and selection a first-class, inspectable, and reproducible process** within a meetup- and hackathon-driven community.
+The system is designed to make **agentic code generation, evaluation, and selection a first-class, inspectable, and reproducible process** within a event- and hackathon-driven community.
 
 Its primary purpose is to support a recurring workflow in which:
 - real-world software problems are proposed,
 - iteratively refined as *Problem Cards*,
 - evaluated by humans and agents using structured inventories,
-- selected, deferred, or rejected through explicit decisions,
-- and reflected upon longitudinally across versions and meetups.
+- curated through explicit decisions along two orthogonal dimensions: readiness state (intrinsic quality) and action state (community intent),
+- and reflected upon longitudinally across versions and events.
 
 The system treats **evaluation and decision-making as core artifacts**, not as ephemeral side effects of discussion. It exists to surface *why* something was built, *why* something was not built, and *how* understanding evolved over time.
 
 ## 1.2 Intended Use Context
 
 The system is explicitly built for:
-- in-person and hybrid meetups,
+- in-person and hybrid events,
 - time-boxed hackathons,
 - exploratory and professional software engineering contexts,
 - and mixed human–AI collaboration.
 
 It assumes:
-- good-faith participation,
-- moderate scale (dozens, not thousands of concurrent users),
-- and a strong preference for transparency over strict access control.
+- good-faith participation from authenticated users,
+- moderate scale (dozens per event, hundreds across the community),
+- and a strong preference for transparency over complex authorization hierarchies.
 
-The system is **not** optimized for anonymous mass surveys, competitive scoring platforms, or production-grade authentication flows. These are intentionally out of scope.
+The system **requires** authentication for all participation (email+password or OAuth via GitHub/LinkedIn) to enable persistent identity, attribution, and cross-location continuity. However, it **does not** implement enterprise-grade authentication features such as SAML SSO, multi-factor authentication, or advanced identity federation.
+
+The system is **not** optimized for anonymous mass surveys or competitive scoring platforms. These are intentionally out of scope.
 
 ## 1.3 Core Design Principles
 
@@ -74,17 +76,22 @@ The system **does include**:
 - structured assessments via inventories,
 - human and agent evaluations,
 - explicit decision logging,
-- meetup planning and orchestration,
-- and longitudinal analysis across versions and events.
+- event planning and orchestration,
+- longitudinal analysis across versions and events,
+- authentication and identity management (email/password, OAuth),
+- contribution recognition (points for quality content, stars for excellence),
+- team chat and real-time collaboration,
+- transactional email notifications (registration, waitlist, onboarding).
 
 The system **explicitly excludes**:
 - automated code execution or CI pipelines,
 - deep repository analytics beyond lightweight snapshots,
 - real-time collaborative editing,
-- complex notification systems,
-- and social features such as follower graphs or reputation scores.
+- complex multi-channel notification infrastructure (push notifications, SMS, preference management dashboards),
+- social networking features (follower graphs, friend connections, profile customization),
+- competitive reputation systems that affect permissions or authority.
 
-These exclusions are intentional to preserve conceptual clarity and maintainability.
+These exclusions are intentional to preserve conceptual clarity and maintainability. The contributor recognition system (points/stars) provides event-scoped acknowledgment without creating social hierarchies or affecting user permissions.
 
 ## 1.5 Relationship to Other Chapters
 
@@ -94,7 +101,7 @@ This chapter defines the invariant constraints for the entire specification.
 - **Chapters 4–6** operationalize the notion of Problems and Versions.
 - **Chapters 7–9** implement the evaluation philosophy defined above.
 - **Chapter 10** formalizes decisions as the sole state-changing mechanism.
-- **Chapters 11–15** translate these principles into meetup-time workflows and UI behavior.
+- **Chapters 11–15** translate these principles into event-time workflows and UI behavior.
 
 Any future extension must be evaluated against the principles defined in this chapter before inclusion.
 

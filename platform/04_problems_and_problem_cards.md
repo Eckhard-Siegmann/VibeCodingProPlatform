@@ -1,6 +1,6 @@
 # 4. Problems and Problem Cards
 
-This chapter defines the **Problem** as the central domain object and introduces the **Problem Card** as its primary working surface. It clarifies how problems are identified, versioned, shared, evaluated, and transitioned through the meetup lifecycle, while maintaining strict separation between content, evaluation, and decisions.
+This chapter defines the **Problem** as the central domain object and introduces the **Problem Card** as its primary working surface. It clarifies how problems are identified, versioned, shared, evaluated, and transitioned through the event lifecycle, while maintaining strict separation between content, evaluation, and decisions.
 
 ---
 
@@ -19,34 +19,31 @@ Each Problem is assigned a stable internal identifier at creation time. This ide
 
 ### Problem Creation and Identity
 
-Creating a problem requires providing an **email address**. This email:
-- Creates a password-less user record (or reuses an existing one with the same email)
-- Enables attribution of the problem to its owner
-- Allows moderators to contact Problem Owners when needed
+Creating a problem requires **authentication** (see Chapter 18). The authenticated user becomes the Problem Owner (PO).
 
-No password is set; the Problem Owner does not "log in" to edit their problem. Instead, access is granted via the private URL.
+- The user's email ensures persistent identity across the platform
+- The user can create multiple problems
+- Attribution is tied to their authenticated account
+- Moderators can contact Problem Owners through the platform
 
-### Dual URL Model
+### URL Model
 
-Each Problem is associated with **two immutable, hash-based URLs**, generated once at creation and never modified:
+Each Problem has a **public URL** using a human-readable slug:
 
-- **Public URL (Viewer URL)**
-  - Read-only access.
-  - Intended for sharing, discussion, and transparency.
-  - Visible to anyone with the link.
-  - Allows commenting and viewing assessments, but no editing.
+```
+/problem/{slug}
+```
 
-- **Private URL (Editor URL)**
-  - Full edit access to the Problem Card.
-  - Treated as confidential ("security by obscurity").
-  - Clearly marked in the UI with warnings such as *"Do not share this screen"*.
-  - Intended for the Problem Owner (PO) and trusted collaborators.
+Examples:
+- `/problem/rag-retrieval-quality`
+- `/problem/code-eval-agent`
 
-Upon creation, the private URL is:
-- **Displayed immediately** on screen (with a prompt to bookmark it)
-- **Sent via email** to the provided address
+Access control is **role-based**, not URL-based:
+- All authenticated users can view public problem details
+- Only the Problem Owner can edit their problems
+- Moderators and Admins have elevated access
 
-These URLs exist independently of authentication. However, authenticated users (e.g. Moderators, Admins) may additionally gain controlled access via login-based permissions.
+**Note**: The previous "private URL" model (security by obscurity) is deprecated. Access is now controlled via authentication.
 
 ### Best Practices and Help
 
@@ -56,11 +53,11 @@ During drafting, the Problem Card UI displays a link to the **Best Practices Gui
 - Repository setup recommendations
 - Tooling documentation for PR submissions
 
-**Exploratory and rough problems are welcome.** The meetup culture encourages submitting ideas that aren't fully formed. Moderators can help refine rough concepts into workable problems. A great intuition is more valuable than a mediocre specification.
+**Exploratory and rough problems are welcome.** The event culture encourages submitting ideas that aren't fully formed. Moderators can help refine rough concepts into workable problems. A great intuition is more valuable than a mediocre specification.
 
 ### Archival Behavior
 
-Problems can be archived or rendered inactive for future meetups. Archiving:
+Problems can be archived or rendered inactive for future events. Archiving:
 
 - Removes the Problem from default listings and dashboards.
 - Does **not** invalidate existing URLs.
@@ -81,34 +78,120 @@ A Problem Card typically contains:
 - Title and concise problem statement
 - Detailed description and motivation
 - Expected value or relevance
-- Repository URL (primary, typically GitHub)
-- Optional secondary URL (documentation, demo, etc.)
-- Structural metadata (e.g. problem type, complexity indicators)
+- **Direct Resources**: Repositories and resources directly relevant to the problem
+- **Helpful Artifacts**: Repositories and resources with useful reference material
+- Structural metadata (problem type, task count) — see "Informative Metadata" below
 - Version metadata and change comments
-- Links to assessments, decisions, and comments
+- Team chat display (see Chapter 31)
+- "Challenge accepted" button for team formation
 
 The Problem Card is intentionally **content-focused**. It does not store votes, ratings, or decisions directly; instead, it acts as the anchor that those artifacts reference.
 
+### Resource Lists
+
+Each problem maintains **two distinct resource lists**:
+
+**Direct Resources** (`resource_type = 'direct'`)
+- The problem's own repository
+- Related specifications or documentation
+- Test suites or validation tools
+- Resources essential for understanding/solving the problem
+
+**Helpful Artifacts** (`resource_type = 'helpful'`)
+- Reference implementations
+- Similar projects for inspiration
+- Learning resources
+- Tools and libraries that may help
+
+#### Edit Permissions for Resources
+
+| Actor | Direct Resources | Helpful Artifacts |
+|-------|-----------------|-------------------|
+| Problem Owner | Add/Edit | Add/Edit |
+| Team Members | Add/Edit | Add/Edit |
+| Moderators | Add (auto-approved) | Add (auto-approved) |
+| Observers | Suggest (PO approves) | Suggest (PO approves) |
+
+### Team Formation
+
+Users can join a problem's team by clicking **"Join as Dev"** on the Problem Card. Team members gain access to shared chat, can contribute resources, and collaborate on solutions. See Chapter 31 for the complete team formation specification and Chapter 13 for UI details.
+
+### Breakout Room URL
+
+Each problem-event team has an optional **breakout room URL** (e.g., Google Meet, Zoom):
+
+- Can be added by PO, moderator, or any team member
+- Displayed prominently in the Problem Card when team is formed
+- Facilitates video collaboration during sprints
+
+### Lessons Learned Log
+
+Each Problem has a distinct **Lessons Learned Log** — a structured repository of insights that emerge from working on the problem. Unlike chat messages (which flow chronologically), lessons learned are curated, categorized knowledge artifacts.
+
+**Note**: This is distinct from the `lessons_learned` **inventory** (Ch.24), which is a post-event assessment questionnaire using structured rating items. The Lessons Learned **Log** captures freeform insights; the `lessons_learned` **inventory** captures quantitative reflections.
+
+**Why separate from chat?**
+- Insights often emerge days or weeks after an event
+- Lessons need structure (categories, tags, valuable flags) for analysis
+- Agents can mine lessons learned for pattern detection
+- Cross-location knowledge sharing requires filterable insights
+
+**Structure:**
+- **Content**: The insight text
+- **Category**: Predefined (tooling, architecture, process, gotcha, performance, testing)
+- **Tags**: Optional freeform tags for additional context
+- **Valuable flag**: Marked for cross-location sharing
+- **Event context**: Which event this insight came from
+
+**Visibility:**
+- Displayed prominently on Problem Card, **above** the team chat
+- Allows filtering by category and event
+- "Valuable" lessons are surfaced to other locations
+
+See Chapter 13 for UI specification and Chapter 19 for data model.
+
 ### Versioning Model
 
-Problem Cards are **versioned explicitly**:
+Problem Cards are **versioned explicitly** through a two-layered model:
 
-- **Major Versions**  
-  Represent deliberate, user-triggered updates (e.g. “Modify / Update Problem”).  
-  Examples:
-  - Refinement of the problem statement
-  - Structural changes to the task
-  - Alignment after moderator feedback
-  - Rollback to an earlier version (implemented as a new major version)
+- **Major Versions** represent deliberate semantic changes to the problem definition
+- **Minor Versions** track repository state evolution via commit hashes
 
-- **Minor Versions**  
-  Represent repository-level evolution, captured automatically via lightweight GitHub snapshots (e.g. HEAD commit hash).  
-  Minor versions:
-  - Do not change the Problem Card text.
-  - Provide contextual grounding for assessments and votes.
-  - Enable fine-grained temporal analysis when repositories evolve during evaluations.
+Only one major version is active at any time. Earlier versions remain accessible in read-only historical view mode.
 
-At any time, **only one major version is active**. Earlier versions remain accessible in read-only “archived view” mode.
+**See Chapter 5** for the complete versioning specification, including version creation triggers, rollback semantics, and repository snapshot mechanics.
+
+### Informative Metadata
+
+The following fields on problems and problem versions are **purely informative** — they aid human understanding and future analytics but do not drive workflow logic or trigger any automated behavior.
+
+**Problem Type** (`problem_type`)
+
+Classifies the nature of the problem:
+
+| Type | Description |
+|------|-------------|
+| `explorative` | Early-stage idea exploration, not yet fully formed |
+| `greenfield` | New project from scratch, no existing code |
+| `advanced_greenfield` | Building on existing greenfield work |
+| `brownfield` | Existing codebase with constraints |
+| `reverse_engineering` | Understanding and documenting existing system |
+| `other` | Does not fit other categories |
+
+**Task Count** (`task_count`)
+
+The number of sub-tasks or milestones identified in the problem. This is a **complexity indicator** that shows structural evolution across versions:
+
+- v1 with `task_count = 1` → monolithic, undifferentiated problem
+- v2 with `task_count = 4` → decomposed into sub-tasks
+
+Task details themselves live in the repository (in markdown, issues, or project boards). The platform does not track individual tasks — only the count as metadata.
+
+**Future direction**: Agents may analyze repositories to suggest subtask decomposition and automate task counting.
+
+**Why informative only?**
+
+These fields help moderators and participants understand the problem's nature at a glance. They enable filtering and analytics (e.g., "How do greenfield problems compare to brownfield?"). But they do not affect state transitions, permissions, or workflow — those are driven exclusively by decisions (see Chapter 10).
 
 ### Editing and Submission Semantics
 
@@ -131,18 +214,19 @@ This is achieved through two orthogonal state dimensions:
 
 The **Readiness State** reflects the *intrinsic quality and preparedness* of the Problem Card itself.
 
-Typical readiness states include (conceptually):
+The system defines five readiness states:
 
-- Draft (not yet submitted)
-- Submitted
-- Accepted (possibly with objections)
-- Rejected (e.g. low quality, unclear, unsuitable)
+- **Draft** — Problem being authored, not yet submitted for review
+- **Submitted** — Submitted for review, awaiting quality gate evaluation
+- **Needs Changes** — Quality gate feedback received, refinement required before acceptance
+- **Ready** — Quality gate passed, suitable for event consideration
+- **Rejected** — Quality gate failed, not suitable in current form
 
 Readiness answers questions such as:
 
 - Is the problem well-defined?
 - Is it understandable and testable?
-- Is it aligned with the meetup’s quality standards?
+- Is it aligned with the event’s quality standards?
 
 Readiness is primarily influenced by:
 - Problem Owner actions
@@ -153,21 +237,24 @@ Readiness is primarily influenced by:
 
 ### Action State
 
-The **Action State** reflects *what the community intends to do* with the Problem in the meetup context.
+The **Action State** reflects *what the community intends to do* with the Problem in the event context.
 
-Examples include:
+The system defines six action states:
 
-- Selected for meetup
-- Selected for pitch
-- Selected for coding
-- Deferred (for various reasons)
-- Dropped
+- **Backlog** — General pool, available for future events
+- **Selected for Event** — Planned for upcoming/current event agenda
+- **Selected for Coding** — Actively being worked on in sprint (subset of selected for event)
+- **Deferred** — Postponed to future (with specific reason recorded in decision)
+- **Dropped** — Removed from consideration, will not continue
+- **Closed** — Completed successfully, no further action needed
+
+Note: Live orchestration modes (pitch open, review open) are **not** action states. They are transient operational contexts derived from decisions and tracked separately in the `event_live_context` table. See Chapter 14 for live interaction modes.
 
 Action answers questions such as:
 
 - Will this problem be pitched?
-- Will it be worked on in this meetup?
-- Is it postponed to a future meetup?
+- Will it be worked on in this event?
+- Is it postponed to a future event?
 
 Action State is typically driven by:
 - Moderator decisions
@@ -190,3 +277,52 @@ This dual-state model ensures that the system can represent real-world decision-
 ---
 
 Together, immutable Problem identity, the Problem Card as a versioned working artifact, and the dual-state model form the structural core on which assessments, decisions, dashboards, and analytics are built.
+
+---
+
+## 4.3 Mobile Interface Patterns
+
+**Added 2026-02-05**: Mobile-specific display patterns for Problem Card.
+
+### Collapsible Sections
+
+**Mobile (<768px)**: Problem Card sections are collapsible to reduce scroll length (Decision #28).
+
+**Default Collapsed**:
+- Lessons Learned Log
+- Decision History
+
+**Default Open**:
+- Description & Resources
+- Assessments
+- Team Section
+- Team Chat
+
+**Implementation**: AccordionSection component (Ch.26.11.20)
+- Tap section header to expand/collapse
+- Smooth 200ms height animation
+- Chevron icon rotates to indicate state
+
+**Desktop (≥768px)**: All sections always visible, no collapsing. Accordion disabled for optimal information density.
+
+### Avatar Display
+
+**Added 2026-02-05**: Visual identity for users throughout Problem Card.
+
+**Problem Owner in Header**:
+- InitialAvatar component (size="lg", 48px)
+- Colored circle with initials (e.g., "MM" for Max Mustermann)
+- Deterministic color from user_id (8-color palette)
+- Positioned before problem title
+
+**Team Members**:
+- InitialAvatar (size="md", 36px) before each name
+- Ordering: PO (first) → Deputy → Active Coders → Retired
+- Online indicator: Green dot if user currently viewing problem (future)
+
+**Chat Messages**:
+- InitialAvatar (size="sm", 32px) before message bubbles
+- Omitted for own messages (right-alignment indicates ownership)
+- Grouped messages: Avatar shown only on first in group
+
+**Specification**: See Ch.26.11.16 for complete avatar specification and Ch.26.15.2 for chat-specific usage.

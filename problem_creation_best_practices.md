@@ -1,19 +1,19 @@
 # Problem Creation Best Practices
 
-This guide helps you create effective Problem Cards for the agentic coding meetup, tailored for professional software developers, data scientists and engineers. Whether you have a polished specification or just a wild idea, there's a place for you here.
+This guide helps you create effective Problem Cards for the agentic coding event, tailored for professional software developers, data scientists and engineers. Whether you have a polished specification or just a wild idea, there's a place for you here.
 
 ---
 
 ## 1. Pros for Pros: Our Philosophy
 
-This meetup is built on **trust and low barriers**.
+This event is built on **trust and low barriers**.
 
 - **Experienced practitioners need little context** – we assume competence
 - **No long PRDs required** – unless you want precise benchmarking
 - **Collaboration is your ally** – rough ideas can be shaped together
 - **Transparency over formality** – we learn from each other's approaches
 
-You don't need permission to experiment. You don't need a perfect specification. You need curiosity and willingness to share what you learn. Bring your own problem *BYOP* is the core of the Meetup. Challenge your own meta reflections on how clear you present a problem. Problem Owners do not code their own problem - they watch others with their individual approaches using different platforms, agents and tools. Artifacts created in the meetup shall help everyone to improve the own productivity and quality. The platform incorporates questionaires for problem pitches and code reviews. Constistent data gathering allows for longitudinal studies and will become a data goldmine for agents we will build in later meetups. 
+You don't need permission to experiment. You don't need a perfect specification. You need curiosity and willingness to share what you learn. Bring your own problem *BYOP* is the core of the Event. Challenge your own meta reflections on how clear you present a problem. Problem Owners do not code their own problem - they watch others with their individual approaches using different platforms, agents and tools. Artifacts created in the event shall help everyone to improve the own productivity and quality. The platform incorporates questionaires for problem pitches and code reviews. Constistent data gathering allows for longitudinal studies and will become a data goldmine for agents we will build in later events. 
 
 ---
 
@@ -39,7 +39,7 @@ All of these are valid starting points:
 - Reproducible environment
 - **Ideal for benchmarking different agentic tools**
 
-The more specified your problem, the easier it is to compare approaches across Cursor, Claude Code, Codex, Antigravity, or other frameworks. But don't let that stop you from submitting rough ideas. Meetup participants who selected your problem sit next to you or are in a breakout room you arrange for them. While answering open questions you get a good feedback what you forgot to clarify upfront.
+The more specified your problem, the easier it is to compare approaches across Cursor, Claude Code, Codex, Antigravity, or other frameworks. But don't let that stop you from submitting rough ideas. Event participants who selected your problem sit next to you or are in a breakout room you arrange for them. While answering open questions you get a good feedback what you forgot to clarify upfront.
 
 ---
 
@@ -47,7 +47,7 @@ The more specified your problem, the easier it is to compare approaches across C
 
 ### Greenfield
 Fresh start, no existing code constraints.
-- Currently **best suited** for the meetup
+- Currently **best suited** for the event
 - Clear scope, measurable outcomes
 - Most agentic tools excel here
 
@@ -55,22 +55,22 @@ Fresh start, no existing code constraints.
 Some greenfield code and auxiliary artifacts already exist
 - APIs, external services, architectural decisions
 - Requires more context in the problem description
-- **Growing capability** of the meetup community
+- **Growing capability** of the event community
 
 ### Brownfield
 Existing codebase, legacy constraints, real-world messiness.
 - This is where **real professional value** lies
 - Currently challenging for most agentic tools
-- The meetup **aims to tackle these** as we collectively improve
+- The event **aims to tackle these** as we collectively improve
 - If you have a brownfield problem, bring it – we'll learn together
 
-**Our vision**: The community grows together to solve increasingly complex problems. Today's impossible brownfield challenge becomes next year's solved pattern. Important artifacts can be improved over multiple meetups.
+**Our vision**: The community grows together to solve increasingly complex problems. Today's impossible brownfield challenge becomes next year's solved pattern. Important artifacts can be improved over multiple events.
 
 ---
 
 ## 4. Writing Your Problem Card
 
-A **Problem Card** describes the challenge you bring to the meetup.  
+A **Problem Card** describes the challenge you bring to the event.  
 It does not need to be perfect — it needs to be **clear enough to evaluate and compare**.
 
 ### Required fields
@@ -204,9 +204,9 @@ Your PR teaches others nothing if it's just code. The journey matters as much as
 
 ## 9. Getting Help
 
-- **Before the meetup**: Moderators can help refine rough ideas
-- **During the meetup**: Ask questions, pair up, learn together
-- **After the meetup**: Review stays open – add reflections later
+- **Before the event**: Moderators can help refine rough ideas
+- **During the event**: Ask questions, pair up, learn together
+- **After the event**: Review stays open – add reflections later
 
 This is a community of practitioners helping each other get better at working with AI. Your contribution – whether polished or rough – makes us all stronger.
 

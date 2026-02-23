@@ -2,7 +2,7 @@
 	import PageContainer from '$lib/components/layout/PageContainer.svelte';
 	import Header from '$lib/components/layout/Header.svelte';
 	import AssessmentForm from '$lib/components/assessment/AssessmentForm.svelte';
-	import Card from '$lib/components/ui/Card.svelte';
+	import { Card } from '$lib/components/ui/card';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -22,7 +22,7 @@
 
 <PageContainer>
 	{#if !assessment.is_open}
-		<Card class="text-center py-8">
+		<Card elevation="resting" class="text-center py-8">
 			<div class="text-alert text-4xl mb-4">!</div>
 			<h2 class="text-xl font-semibold text-headers mb-2">Assessment Closed</h2>
 			<p class="text-labels">This assessment is no longer accepting responses.</p>

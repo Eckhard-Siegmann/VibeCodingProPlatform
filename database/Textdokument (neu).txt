@@ -1,3 +1,3 @@
   To test locally:
-  sqlite3 meetup.db < database/schema.sql
-  sqlite3 meetup.db < database/seed_reference_data.sql
+  sqlite3 event.db < database/schema.sql
+  sqlite3 event.db < database/seed_reference_data.sql

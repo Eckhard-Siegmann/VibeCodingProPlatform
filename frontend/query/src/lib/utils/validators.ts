@@ -4,21 +4,21 @@ export const RoleSchema = z.enum(['problem_owner', 'developer', 'observer']);
 export type Role = z.infer<typeof RoleSchema>;
 
 export const TimeContextSchema = z.enum([
-	'pre_meetup',
+	'pre_event',
 	'pitch',
 	'review',
-	'post_meetup',
+	'post_event',
 	'late_reflection'
 ]);
 export type TimeContext = z.infer<typeof TimeContextSchema>;
 
 export const ResponseItemSchema = z.object({
 	item_id: z.string().uuid(),
-	rating_value: z.number().int().min(1).max(10)
+	rating_value: z.number().int().min(1).max(5) // Unified 5-point scale per Ch.7.3
 });
 
 export const SubmitResponsesSchema = z.object({
-	session_hash: z.string().length(64),
+	session_hash: z.string().min(8), // Relaxed for dev (fallback hashes are shorter)
 	role: RoleSchema,
 	time_context: TimeContextSchema,
 	in_presence: z.boolean(),
@@ -50,13 +50,15 @@ export const MatrixSchema = z.object({
 
 export const RenderStructureSchema = z.object({
 	assessment_id: z.string(),
-	problem_id: z.string(),
-	problem_title: z.string(),
+	inventory_id: z.string(),
 	inventory_key: z.string(),
 	inventory_name: z.string(),
+	problem_id: z.string().nullable(),
+	problem_title: z.string(),
+	major_version: z.number().int().nullable(),
 	time_context: TimeContextSchema,
-	render_type: z.literal('single_matrix'),
 	is_open: z.boolean(),
+	render_type: z.enum(['single_matrix', 'mixed_matrices']),
 	matrix: MatrixSchema
 });
 

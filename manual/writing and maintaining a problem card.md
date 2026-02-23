@@ -1,6 +1,6 @@
 ## 4. Writing and Maintaining a Problem Card
 
-This chapter explains how to write a **Problem Card** in a way that fits the meetup’s evaluation, comparison, and longitudinal learning goals.  
+This chapter explains how to write a **Problem Card** in a way that fits the event’s evaluation, comparison, and longitudinal learning goals.  
 A Problem Card is not just a text description: it is a **versioned, assessable artifact** that connects requirements, repositories, evaluations, and decisions over time.
 
 The guidance below is aligned with the actual **data model**, **assessment workflows**, and **decision processes** used by the platform.
@@ -87,7 +87,7 @@ Iteration is expected and explicitly supported via versioning.
 
 ### 4.4 “Done” Means Comparable, Not Finished
 
-In this meetup format, “done” does **not** mean:
+In this event format, “done” does **not** mean:
 - feature-complete
 - production-ready
 - optimal
@@ -132,7 +132,7 @@ Every Problem Card can be assessed with **multiple inventories**, for example:
 - Problem suitability (ProblemEval)
 - Pitch evaluation
 - Review evaluation
-- Meetup alignment
+- Event alignment
 - Lessons learned (post-event)
 
 Assessments:

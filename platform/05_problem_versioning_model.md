@@ -82,43 +82,50 @@ Both dimensions remain analyzable independently.
 
 ---
 
-## 5.3 Version Navigation and Historical Views
+## 5.3 GitHub Availability and Minor Version Nullability
 
-The Problem Card UI exposes versioning explicitly and transparently.
+Minor Versions require access to the repository's HEAD commit hash. In cases where GitHub is unavailable (network issues, API limits, rate limiting, or private repositories), the system allows assessments to proceed with `minor_version = NULL`.
 
-### Default View
-By default, users see:
-- The **latest Major Version**.
-- Its **latest Minor Version**.
-- All evaluations and decisions filtered accordingly.
+This pragmatic accommodation ensures:
+- Evaluations can continue even when repository snapshots cannot be captured
+- The system remains usable under degraded conditions
+- Human-centered workflows take priority over technical completeness
 
-This ensures that the default experience always reflects the current state of the Problem.
+See Chapter 19 (Data Model) for schema implementation and Chapter 25 (Interview Findings) for the graceful degradation strategy.
 
-### Major Version Navigation
-Users can:
-- View a list of all Major Versions.
-- Switch the active view to any prior Major Version.
-- Clearly see when a version is historical.
+---
 
-Historical views are visually marked (e.g. warning banner) to prevent accidental confusion with the active version.
+## 5.4 Versioning and Event Association
 
-### Minor Version Expansion
-Optionally, users can:
-- Expand a Major Version to reveal its Minor Versions.
-- Select one or multiple Minor Versions.
-- Aggregate or compare evaluations across repository states.
+When problems are associated with events (see Chapter 29), assessments and team participation reference **specific major versions**. This enables:
 
-This is particularly important for:
-- Understanding rapid iteration during live hacking.
-- Analyzing whether perceived quality improvements track repository evolution.
+**Version-Scoped Evaluation**:
+- Participants evaluate the version that was active when the event began
+- Assessment data remains linked to the semantic snapshot being evaluated
+- Version changes between events enable longitudinal quality analysis
 
-### Filter Integration
-Version selection integrates with other filters, such as:
-- Time context (pre-meetup, pitch, review, post-meetup).
-- Assessment type.
-- Role and participation mode.
+**Team Membership Scoping**:
+- Teams form around a specific major version (see Chapter 31)
+- When Problem Owners create new major versions, team membership resets
+- This prepares problems for fresh collaboration across multiple events
 
-This allows fine-grained, statistically meaningful analysis without duplicating or mutating historical data.
+**Longitudinal Analysis**:
+- How problem definitions evolve based on event feedback
+- Whether version refinements correlate with improved evaluations
+- Cross-event patterns in problem maturity and solution quality
+
+See Chapter 29.8 for event-problem association mechanics.
+
+---
+
+## Relationship to Other Chapters
+
+- **Chapter 4**: Defines Problems and Problem Cards as the versioned artifacts
+- **Chapter 6**: Repositories and external references tracked via minor versions
+- **Chapter 8**: Assessments reference specific problem versions
+- **Chapter 10**: Version creation and rollback operations are logged as decisions
+- **Chapter 13**: Problem Card UI displays version navigation and historical views
+- **Chapter 19**: Data model for `problem_versions` and `problem_repo_snapshots` tables
 
 ---
 
@@ -132,6 +139,6 @@ The Problem Versioning Model establishes a **two-layered, orthogonal notion of c
 Together, they enable:
 - Reproducible evaluation.
 - Transparent decision histories.
-- Longitudinal insight into how problems mature across meetups and agentic workflows.
+- Longitudinal insight into how problems mature across events and agentic workflows.
 
 This model underpins the system’s ability to treat Problems as *living artifacts* without sacrificing rigor or traceability.

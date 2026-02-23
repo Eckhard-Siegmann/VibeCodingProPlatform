@@ -1,16 +1,16 @@
 # 9. Voting and Data Capture
 
-This chapter specifies how human (and agent) input is captured in a precise, analyzable, and future-proof way. It defines the atomic structure of votes, how absence of votes is handled, how participants are identified without accounts, and how contextual dimensions are orthogonalized to support longitudinal and comparative analysis.
+This chapter specifies how human (and agent) input is captured in a precise, analyzable, and future-proof way. It defines the atomic structure of responses, how absence of responses is handled, how participants are authenticated, and how contextual dimensions are orthogonalized to support longitudinal and comparative analysis.
 
 The design goal is to ensure that **every recorded data point is interpretable in isolation**, while still supporting rich aggregation and filtering across time, roles, and situations.
 
 ---
 
-## 9.1 Atomic Vote Representation
+## 9.1 Atomic Response Representation
 
-At the lowest level, the system records **atomic votes**. An atomic vote represents a single response to a single Item, under a specific contextual configuration.
+At the lowest level, the system records **atomic responses**. An atomic response represents a single answer to a single Item, under a specific contextual configuration.
 
-Each atomic vote is defined by the following conceptual components:
+Each atomic response is defined by the following conceptual components:
 
 - **Item reference**  
   Identifies *what* was evaluated. Items are immutable and fully define scale semantics (max rating, labels, intent).
@@ -26,20 +26,20 @@ Each atomic vote is defined by the following conceptual components:
 - **Assessment reference**  
   Identifies *which assessment instance* this vote belongs to (e.g. Pitch Assessment, Review Assessment, Self-Assessment).
 
-- **Raw value**  
-  A single integer value, consistent with the Item’s `max_rating`.  
+- **Raw value**
+  A single integer value, consistent with the Item's `max_rating`.
   No transformations, weights, or normalizations are applied at capture time.
 
-- **Timestamp**  
-  The exact time at which the vote was submitted.
+- **Timestamp**
+  The exact time at which the response was submitted.
 
-Crucially, **votes are never stored as aggregates**. All higher-level statistics (means, distributions, deltas, comparisons) are derived from atomic votes at query time. This ensures:
+Crucially, **responses are never stored as aggregates**. All higher-level statistics (means, distributions, deltas, comparisons) are derived from atomic responses at query time. This ensures:
 
 - Full reproducibility
 - Retrospective re-analysis with new hypotheses
 - Compatibility with statistical and ML workflows
 
-Votes are append-only. They are never mutated or deleted, even if later decisions supersede their relevance.
+Responses are append-only. They are superseded (not deleted) when revised, preserving full history even if later decisions change their relevance.
 
 ---
 
@@ -55,7 +55,7 @@ Key principles:
 
 If a participant does not provide a response for an Item:
 
-- **No atomic vote is recorded** for that Item.
+- **No atomic response is recorded** for that Item.
 - Missingness is represented implicitly by absence, not by a special value.
 
 This approach has several advantages:
@@ -67,129 +67,87 @@ This approach has several advantages:
 Missingness itself is analytically meaningful and can be studied via:
 
 - Response counts (`N`) per Item
-- Comparisons between contexts (e.g. fewer answers during live pitch vs. post-meetup)
+- Comparisons between contexts (e.g. fewer answers during live pitch vs. post-event)
 - Correlation with engagement/intensity items captured elsewhere
 
 The system explicitly favors **data honesty over forced completeness**.
 
 ---
 
-## 9.3 Session Identity and Pseudonymity
+## 9.3 Authentication Requirements
 
-Participants are identified through **pseudonymous session identities**, not user accounts.
+All participation requires **mandatory authentication** (see Chapter 18 for complete authentication specification).
 
-Core properties of session identity:
+Key implications for response capture:
 
-- A **random client-generated identifier** is created on first interaction.
-- The identifier is stored in browser local storage.
-- On the server side, only a **hashed representation** of this identifier is persisted.
-- No cookies, fingerprinting, or IP-based heuristics are required.
+- All responses are linked to authenticated user accounts via `user_id` (NOT NULL)
+- Each response captures the user's role at submission time
+- All votes and assessments are attributable to specific users
+- No anonymous or pseudonymous participation is supported
 
-This mechanism provides:
-
-- **Intra-session consistency**  
-  Multiple votes from the same participant can be linked.
-
-- **Pre/Post pairing**  
-  Changes in individual responses across time can be analyzed.
-
-- **Low barrier to participation**  
-  No login is required for voting or assessments.
-
-Session identities are intentionally fragile across devices and browsers. This is considered acceptable and even desirable, as the system prioritizes:
-
-- Privacy and minimal personal data
-- Lightweight participation
-- Statistical signal at group level rather than individual tracking
-
-For moderators and administrators, authenticated accounts exist, but **these identities are not reused for voting contexts**. When moderators vote, they do so under the same pseudonymous model as all other participants.
+This enables accountability, longitudinal tracking across events, and role-aware analysis.
 
 ---
 
 ## 9.4 Backend-Prepared Assessment Render Structures
 
-The system does not expose raw items or scale details directly to the frontend.
-Instead, the backend performs scale consistency validation and returns a single, render-ready JSON object.
-
-### Scale Consistency Validation
-
-Before rendering an Assessment, the backend:
-1. Fetches all items in the inventory (with active versions)
-2. Extracts the scale signature from each item (max_rating + label set)
-3. Groups items by scale signature
-4. Determines render strategy based on consistency
-
-### Render Types
-
-**single_matrix** (MVP): All items share identical scale
-- Returns one matrix with common column headers and all items as rows
-- Minimal cognitive overhead for evaluators
-
-**mixed_matrices** (Future): Items have heterogeneous scales
-- Returns multiple sections, each with its own render mode
-- Sections may use different scales: traditional matrix (5-point), slider (continuous), binary choice, etc.
-- Frontend renders each section according to its `render_mode`
-
-### Benefits of Backend Ownership
-
-- **Scale logic is centralized**: All validation happens once at the backend
-- **Frontend is stateless**: Receives structured data, performs no conditionals beyond layout
-- **Future-proof**: New scales (7-point, slider, binary) automatically supported
-- **Testable**: Backend logic can be unit-tested independently
+The system uses backend-prepared render structures to optimize assessment display. The backend performs scale consistency validation and returns render-ready JSON; see Chapter 7.4 for complete specification.
 
 ---
 
-## 9.6 Context Orthogonalization (Role, Time, Location)
+## 9.5 Context Orthogonalization (Role, Time, Participation Mode)
 
-Every atomic vote is contextualized along a set of **orthogonal dimensions**. These dimensions are recorded explicitly and independently, rather than inferred from surrounding state.
+Every atomic response is contextualized along a set of **orthogonal dimensions**. These dimensions are recorded explicitly and independently, rather than inferred from surrounding state.
 
-### 9.6.1 Role Context
+### 9.5.1 Role Context
 
-Each vote is associated with exactly one role at the time of voting, such as:
+Each response is associated with exactly one role at the time of submission, using the seven canonical roles defined in Chapter 3.10:
 
-- Problem Owner
+- Observer
 - Developer
 - Coding Partner
-- Observer
+- Problem Owner
+- Moderator
+- Administrator
 - Agent (non-binding evaluations only)
 
 Roles are self-declared per assessment context and are not assumed to be stable across problems or time.
 
 ---
 
-### 9.6.2 Time Context
+### 9.5.2 Time Context
 
-Votes are tagged with a discrete **time context**, representing their position in the meetup lifecycle, for example:
+Responses are tagged with a discrete **time context**, representing their position in the event lifecycle. The canonical values from `time_context_catalog` (Chapter 19.2.5) are:
 
-- Pre-drafting
-- Pre-meetup
-- Pre-refinement
-- During pitch
-- During review
-- Post-meetup
-- Late reflection
+- **Pre-event** — Before the event begins
+- **Pitch** — During or immediately after live pitch
+- **Review** — After coding/hacking, evaluating outcomes
+- **Post-event** — Shortly after event ends
+- **Late reflection** — Days/weeks later, delayed insights
 
-This allows fine-grained temporal analysis without relying solely on timestamps, which may be ambiguous across meetups and sessions.
+This allows fine-grained temporal analysis without relying solely on timestamps, which may be ambiguous across events and sessions.
 
 ---
 
-### 9.6.3 Location Context
+### 9.5.3 Participation Mode Context
 
-Each session declares a stable **location context**:
+Each authenticated user declares a stable **participation mode** at the start of their event participation:
 
-- In presence
-- Remote
+- In presence (physical attendance)
+- Remote (virtual participation)
 
-This flag is captured once per session and applied consistently to all votes from that session. It enables analysis of hybrid meetup dynamics without repeated user input.
+This flag is captured once when the user begins interacting with event assessments and applied consistently to all responses during that event. It enables analysis of hybrid event dynamics without repeated user input.
+
+**Note**: This is distinct from **geographic location** (Cologne, Aachen, etc.), which is specified at the event level (see Chapter 29).
 
 ---
 
-### 9.6.4 Orthogonality as a Design Invariant
+### 9.5.4 Orthogonality as a Design Invariant
 
 None of these contextual dimensions imply or constrain the others:
 
-- A Problem Owner may vote remotely or in presence.
-- A vote during review may occur pre-meetup or post-meetup.
+- A Problem Owner may submit responses remotely or in presence.
+- A response during review may occur pre-event or post-event.
 - Agents may evaluate at any time context, but never with binding authority.
 
 This orthogonal design ensures that:
@@ -200,6 +158,6 @@ This orthogonal design ensures that:
 
 ---
 
-Together, the mechanisms described in this chapter ensure that voting data is **precise, minimal, interpretable, and analytically powerful**, forming a solid empirical foundation for everything built on top of it.
+Together, the mechanisms described in this chapter ensure that response data is **precise, minimal, interpretable, and analytically powerful**, forming a solid empirical foundation for everything built on top of it.
 
 The backend-prepared render structures ensure that evaluators always see **optimally-formatted assessments** regardless of scale heterogeneity, while the frontend remains focused purely on presentation.

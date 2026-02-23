@@ -19,13 +19,13 @@ Key properties of Inventories:
 - Inventories are **contextual**, not universal:
   - The same Problem may be evaluated with different Inventories at different times.
   - Examples include:  
-    *Problem suitability*, *Pitch assessment*, *Review assessment*, *Lessons learned*, *Meetup alignment*.
+    *Problem suitability*, *Pitch assessment*, *Review assessment*, *Lessons learned*, *Event alignment*.
 - Inventories are **version-stable but replaceable**:
   - If an Inventory needs conceptual change, a new Inventory is created.
   - Historical assessments remain interpretable because they reference the original Inventory definition.
 
 Inventories serve multiple roles simultaneously:
-- They structure human evaluation during live meetups.
+- They structure human evaluation during live events.
 - They enable paired pre/post measurements.
 - They act as stable targets for agent-based evaluation and optimization.
 - They provide the semantic frame for statistical aggregation and comparison.
@@ -107,16 +107,17 @@ The system currently standardizes on:
 
 All items use a unified 5-point scale to minimize cognitive load for evaluators while maintaining semantic clarity across all evaluation contexts.
 
-### Future: Scale Expansion Path
+### Scale Expansion Path
 
-If longitudinal evaluation data reveals insufficient granularity (measured via signal-to-noise ratio, inter-rater agreement, or variance analysis), items can migrate to alternative scales:
+The system supports multiple scale types via automatic UI rendering. The scale selection logic and UI components are specified in Chapter 26 (UI Specification Addendum). Current scale support:
 
-- **Continuous slider** (0-100): For dimensions requiring finer granularity
-- **7-point Likert**: For expanded categorical distinctions
-- **Binary/ternary scales**: For high-stakes binary decisions
-- **Other scales**: Extensible without schema changes
+- **Button scales** (max_rating ≤ 7): Discrete choices with semantic labels (includes 1, 2, 3, 5, 7-point scales)
+- **Continuous sliders** (max_rating > 7): For longitudinal assessments without anchoring bias (e.g., 10-point scales)
+- Future: Additional Likert variations
 
-Migration occurs by creating a new Item version with the same `item_key` but different `max_rating` and labels. Historical assessments remain valid (tied to old `item_id`), and the inventory automatically uses the new active version. The backend's scale consistency checker determines rendering strategy (see Section 7.5).
+**Implementation status**: The unified 5-point scale is implemented. Scale expansion to support button scales ≤7 and sliders >7 is specified in Chapter 26 and partially implemented in frontend/query/src/lib/components/assessment/ItemRow.svelte.
+
+**Migration Process**: Create new Item version with same `item_key` but different `max_rating` and labels. Historical assessments remain valid (tied to old `item_id`), and inventories automatically reference the new active version. The backend's scale consistency checker (Section 7.4) determines rendering strategy. UI components select button vs slider based on max_rating value.
 
 ### Labeling Semantics
 
@@ -134,7 +135,7 @@ This unified labeling reduces cognitive overhead for evaluators while preserving
 ### Labels for Alternative Scales (Future)
 
 If items migrate to alternative scales:
-- **Slider (0-100)**: Only `label_min` and `label_max` set; others NULL
+- **Slider (1-10)**: Only `label_min` and `label_max` set; others NULL
 - **7-point Likert**: All seven positions labeled (or only extremes + mid)
 - **Binary (2-point)**: `label_min` and `label_max` only
 
@@ -172,67 +173,23 @@ The backend checks whether all items in the inventory share identical scale prop
 - Same `max_rating`
 - Same label set (`label_min`, `label_low_mid`, `label_mid`, `label_high_mid`, `label_max`)
 
-**If consistent**: All items can be rendered in a single matrix with common column headers.
-**If inconsistent**: Items are grouped by scale and rendered in multiple sections or with individual labels.
+**If consistent**: All items can be rendered in a single matrix with common column headers (MVP case: all items use unified 5-point scale).
 
-### Backend Endpoint: GET /assessments/{assessmentId}/render-structure
+**If inconsistent**: Items are grouped by scale and rendered in multiple sections (future: mixed button/slider inventories).
 
-The backend does NOT expose raw items to the frontend. Instead, it returns a single, render-ready JSON object:
+### Backend Responsibility
 
-```json
-{
-  "render_type": "single_matrix" | "mixed_matrices",
-  "matrix": {
-    "max_rating": 5,
-    "common_headers": [
-      {"rating_value": 1, "label": "Poor"},
-      {"rating_value": 2, "label": "Fair"},
-      ...
-    ],
-    "rows": [
-      {
-        "item_id": "uuid",
-        "item_key": "correctness",
-        "short_label": "Correctness",
-        "max_rating": 5,
-        "current_rating": null
-      },
-      ...
-    ]
-  }
-}
-```
+The backend does NOT expose raw items to the frontend. Instead, it:
+1. Fetches all items in the inventory (resolved to active versions via `item_key`)
+2. Performs scale consistency validation
+3. Returns a single, render-ready JSON object describing the complete assessment structure
 
-Or for mixed scales:
+The frontend is a stateless renderer with no scale logic or validation.
 
-```json
-{
-  "render_type": "mixed_matrices",
-  "matrices": [
-    {
-      "description": "Quality Assessment (5-point)",
-      "render_mode": "matrix",
-      "rows": [...]
-    },
-    {
-      "description": "Cognitive Load (slider)",
-      "render_mode": "slider",
-      "rows": [...]
-    }
-  ]
-}
-```
-
-### Frontend Rendering
-
-The frontend is a stateless renderer that:
-- Fetches the render structure
-- Renders the appropriate UI based on `render_type` and `render_mode`
-- Contains no scale logic or validation
+**For complete API specification**, including JSON structure, endpoint details, and frontend rendering examples, see **Chapter 26.4** (UI Specification Addendum).
 
 This separation ensures:
 - Scale consistency is validated once at the backend
-- The frontend has no rendering conditionals beyond layout
 - New scales (7-point, slider, binary) can be added without frontend changes
 - Future scale migrations are transparent to the UI
 

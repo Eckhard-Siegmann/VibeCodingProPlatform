@@ -19,7 +19,7 @@ The decisions table provides a **chronological, human-readable record** of what 
 - What happened, in what order?
 - Who (or what) initiated an action?
 - In which context did the action occur?
-- How did the system evolve during a meetup?
+- How did the system evolve during a event?
 
 Decision records are **descriptive**, not normative in themselves—but binding decisions do determine system state.
 
@@ -31,7 +31,7 @@ All meaningful state changes are recorded as decisions, including:
 
 - Submission, acceptance, and rejection of Problems
 - Selection, deferral, and dropping of Problems
-- Opening and closing of Assessments (pitch, review, post-meetup, etc.)
+- Opening and closing of Assessments (pitch, review, post-event, etc.)
 - Moderator actions such as opening a pitch, closing a review, or initiating a group decision
 - Agent-generated recommendations (non-binding)
 
@@ -39,12 +39,15 @@ Each decision entry records:
 
 - Timestamp
 - Actor identity (human or agent)
+- Actor role (inferred from `users.role` via JOIN at query time)
 - Whether the decision is binding or a recommendation
 - Target Problem and version
 - Decision type (verb in past tense)
 - Optional rationale
 
-**Comments** are stored separately in the `comments` table but can be queried alongside decisions for a complete activity view.
+**Note on role traceability**: Decision actor roles are derived from the `users.role` field rather than stored directly in decisions. For transparency, team chat logs document the active contextual role when significant decisions are made (e.g., "Eva (moderator) selected problem for event").
+
+**Qualitative feedback** is captured via the team chat system in the `chat_messages` table (Chapter 31) and can be queried alongside decisions for a complete activity view. Historical comments from the deprecated `comments` table remain available for audit purposes only.
 
 ---
 
@@ -55,7 +58,7 @@ Activity views are **projections over the decisions table**:
 - **Problem Card – Decision History**:
   Shows all decisions related to that Problem, useful for POs and moderators.
 - **Moderator Dashboard – Activity Feed**:
-  Recent decisions filtered by meetup, supporting situational awareness.
+  Recent decisions filtered by event, supporting situational awareness.
 - **Administrative Views**:
   Full system-wide decision access for debugging, auditing, and research purposes.
 
@@ -107,7 +110,7 @@ Assessments are traceable along complementary dimensions:
 - Which Items were presented
 - Which version of the Problem was assessed
 - In which situational context (time phase, role, location)
-- Whether the assessment occurred pre-meetup, during pitch, during review, or post-meetup
+- Whether the assessment occurred pre-event, during pitch, during review, or post-event
 
 Assessment responses are never overwritten. This allows:
 
@@ -166,6 +169,6 @@ This makes the system particularly suitable for:
 - Studying agentic coding practices
 - Benchmarking human–AI collaboration
 - Evaluating decision-making quality under time pressure
-- Comparing frameworks, tools, and orchestration strategies over multiple meetups
+- Comparing frameworks, tools, and orchestration strategies over multiple events
 
 In short, the system does not merely *host* hackathons — it **remembers them in a form that can be studied, challenged, and learned from**.

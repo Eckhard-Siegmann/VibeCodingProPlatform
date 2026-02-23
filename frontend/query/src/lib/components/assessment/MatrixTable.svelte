@@ -33,7 +33,7 @@
 	let { matrix, responses, disabled = false, onresponse }: Props = $props();
 </script>
 
-<div class="space-y-2">
+<div class="space-y-2 overflow-hidden">
 	<!-- Desktop: Column headers -->
 	<div class="hidden md:flex items-end gap-4 pb-2 border-b border-etch-top">
 		<div class="flex-shrink-0 w-1/3 pr-4">

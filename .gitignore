@@ -1,1 +1,26 @@
 deprecated
+.git
+.obsidian
+.claude
+
+# Runtime database files
+database/event.db
+database/event.db-shm
+database/event.db-wal
+meetup.db
+
+# SQLite tools (binaries)
+database/.sqlite-tools/
+
+# Temp/build artifacts
+nul
+frontend/query/check-*.txt
+frontend/query/test-results/
+ui-test-results/
+
+# QA report artifacts
+BATCH*.txt
+BATCH*.md
+QUALITY_ASSURANCE_REPORT*.md
+consistency_check_*
+generate_consistency_check_plan.py

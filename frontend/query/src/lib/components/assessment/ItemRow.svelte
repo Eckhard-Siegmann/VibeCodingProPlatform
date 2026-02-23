@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ButtonScale from '$lib/components/rating/ButtonScale.svelte';
-	import Card from '$lib/components/ui/Card.svelte';
+	import SliderScale from '$lib/components/rating/SliderScale.svelte';
+	import { Card } from '$lib/components/ui/card';
 
 	interface ScaleHeader {
 		rating_value: number;
@@ -32,24 +33,38 @@
 
 	// Alternate row background
 	let isEven = $derived(index % 2 === 0);
+
+	// Use slider for scales > 5 (per spec: 1-10 slider scales)
+	let useSlider = $derived(item.max_rating > 5);
 </script>
 
 <!-- Mobile: Card layout -->
-<div class="md:hidden">
-	<Card class="mb-3 {isEven ? 'bg-card' : 'bg-canvas/50'}">
+<div class="md:hidden overflow-hidden">
+	<Card elevation="flat" class="mb-3 {isEven ? 'bg-card' : 'bg-canvas/50'}">
 		<div class="mb-3">
 			<h3 class="font-medium text-headers text-base">{item.short_label}</h3>
 			<p class="text-sm text-labels mt-1">{item.full_text}</p>
 		</div>
 
-		<ButtonScale
-			name={item.item_id}
-			{headers}
-			{value}
-			{disabled}
-			onchange={handleChange}
-			ariaLabel={item.short_label}
-		/>
+		{#if useSlider}
+			<SliderScale
+				name={item.item_id}
+				{headers}
+				{value}
+				{disabled}
+				onchange={handleChange}
+				ariaLabel={item.short_label}
+			/>
+		{:else}
+			<ButtonScale
+				name={item.item_id}
+				{headers}
+				{value}
+				{disabled}
+				onchange={handleChange}
+				ariaLabel={item.short_label}
+			/>
+		{/if}
 	</Card>
 </div>
 
@@ -66,13 +81,24 @@
 
 	<!-- Rating scale -->
 	<div class="flex-1">
-		<ButtonScale
-			name={item.item_id}
-			{headers}
-			{value}
-			{disabled}
-			onchange={handleChange}
-			ariaLabel={item.short_label}
-		/>
+		{#if useSlider}
+			<SliderScale
+				name={item.item_id}
+				{headers}
+				{value}
+				{disabled}
+				onchange={handleChange}
+				ariaLabel={item.short_label}
+			/>
+		{:else}
+			<ButtonScale
+				name={item.item_id}
+				{headers}
+				{value}
+				{disabled}
+				onchange={handleChange}
+				ariaLabel={item.short_label}
+			/>
+		{/if}
 	</div>
 </div>

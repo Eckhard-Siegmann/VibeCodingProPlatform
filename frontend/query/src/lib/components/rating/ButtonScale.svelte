@@ -51,7 +51,7 @@
 <div
 	role="radiogroup"
 	aria-label={ariaLabel}
-	class="flex flex-col gap-1 md:flex-row md:gap-2 lg:gap-3"
+	class="flex flex-col gap-1 md:flex-row md:gap-2 lg:gap-3 md:justify-between overflow-hidden"
 	onkeydown={handleKeyDown}
 >
 	{#each headers as header (header.rating_value)}

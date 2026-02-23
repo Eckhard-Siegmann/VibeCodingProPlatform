@@ -1,11 +1,48 @@
 {
+  "env": {
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "80000",
+    "MAX_MCP_OUTPUT_TOKENS": "250000",
+    "MAX_THINKING_TOKENS": "31999"
+  },
   "permissions": {
     "allow": [
       "Bash(git init:*)",
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push)"
+      "Bash(git push)",
+      "Bash(dir:*)",
+      "Bash(npm create svelte@latest:*)",
+      "Bash(npx sv create query --template minimal --types ts --no-add-ons --no-install)",
+      "Bash(npm install)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(git show:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(./.sqlite-tools/sqlite3.exe:*)",
+      "Bash(python3:*)",
+      "Bash(cat:*)",
+      "Bash(pushd:*)",
+      "Bash(npm run check:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(python:*)",
+      "Skill(frontend-design)",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \".tables\")",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \"PRAGMA table_info(items);\")",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\":*)",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \".read D:/dev/prj/meetup/database/seed_reference_data.sql\")",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \"SELECT state_key FROM queue_state_catalog;\")",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \"SELECT type_key FROM partner_type_catalog;\")",
+      "WebSearch",
+      "WebFetch(domain:www.shadcn-svelte.com)",
+      "Bash(xargs -I {} sh -c 'echo \"\"\"\"=== {} ===\"\"\"\" && ls -la \"\"\"\"{}\"\"\"\"')",
+      "Bash(npx svelte-check:*)",
+      "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \"ALTER TABLE users ADD COLUMN audio_cues_enabled INTEGER NOT NULL DEFAULT 0 CHECK(audio_cues_enabled IN (0,1));\")",
+      "Bash(wc -l \"D:\\dev\\prj\\meetup\\frontend\\query\\src\\lib\\server\\repositories\"/*.ts)",
+      "Bash(tee:*)"
     ]
   }
 }

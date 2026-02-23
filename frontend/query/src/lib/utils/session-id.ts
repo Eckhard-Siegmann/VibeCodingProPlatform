@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
+import { simpleHash, hashToHex } from './hash';
 
-const SESSION_KEY = 'meetup_session_id';
+const SESSION_KEY = 'event_session_id';
 
 /**
  * Get or create a session ID stored in localStorage.
@@ -9,26 +10,38 @@ const SESSION_KEY = 'meetup_session_id';
 export function getOrCreateSessionId(): string {
 	if (!browser) return '';
 
-	let sessionId = localStorage.getItem(SESSION_KEY);
+	try {
+		let sessionId = localStorage.getItem(SESSION_KEY);
 
-	if (!sessionId) {
-		sessionId = crypto.randomUUID();
-		localStorage.setItem(SESSION_KEY, sessionId);
+		if (!sessionId) {
+			sessionId = crypto.randomUUID();
+			localStorage.setItem(SESSION_KEY, sessionId);
+		}
+
+		return sessionId;
+	} catch {
+		// localStorage might be blocked (private browsing, etc.)
+		return 'temp-' + crypto.randomUUID();
 	}
-
-	return sessionId;
 }
 
 /**
  * Hash a session ID using SHA-256.
  * Returns the hash as a hex string.
+ * Falls back to a simple hash if crypto.subtle is unavailable (non-HTTPS).
  */
 export async function hashSessionId(sessionId: string): Promise<string> {
-	const encoder = new TextEncoder();
-	const data = encoder.encode(sessionId);
-	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-	const hashArray = Array.from(new Uint8Array(hashBuffer));
-	return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+	// crypto.subtle is only available in secure contexts (HTTPS or localhost)
+	if (crypto.subtle) {
+		const encoder = new TextEncoder();
+		const data = encoder.encode(sessionId);
+		const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+		const hashArray = Array.from(new Uint8Array(hashBuffer));
+		return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+	}
+
+	// Fallback: simple hash for development over HTTP
+	return 'dev_' + hashToHex(simpleHash(sessionId));
 }
 
 /**

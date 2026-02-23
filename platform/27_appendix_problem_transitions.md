@@ -22,7 +22,7 @@ Per `readiness_state_catalog` (Ch.19.2.1):
 | `draft` | Problem being authored, not yet submitted for review |
 | `submitted` | Submitted for review, awaiting quality gate evaluation |
 | `needs_changes` | Quality gate feedback received, refinement required before acceptance |
-| `ready` | Quality gate passed, suitable for meetup consideration |
+| `ready` | Quality gate passed, suitable for event consideration |
 | `rejected` | Quality gate failed, not suitable in current form (terminal) |
 
 ### Action States (6 states)
@@ -31,16 +31,16 @@ Per `action_state_catalog` (Ch.19.2.2):
 
 | State Key | Meaning |
 |-----------|---------|
-| `backlog` | General pool, available for future meetups |
-| `selected_for_meetup` | Planned for upcoming/current meetup agenda |
-| `selected_for_coding` | Actively being worked on in sprint (subset of selected for meetup) |
+| `backlog` | General pool, available for future events |
+| `selected_for_event` | Planned for upcoming/current event agenda |
+| `selected_for_coding` | Actively being worked on in sprint (subset of selected for event) |
 | `deferred` | Postponed to future (specific reason recorded in decision_type) |
 | `dropped` | Removed from consideration, will not continue (terminal) |
 | `closed` | Completed successfully, no further action needed (terminal) |
 
 ### Live Context (Separate from Action State)
 
-**Important**: Live orchestration modes (`idle`, `pitch`, `review`) are **not** action states. They are tracked separately in the `meetup_live_context` table (Ch.19.3.4) and represent transient operational context during active meetups. Opening or closing a pitch/review assessment does not change the Problem's `current_action_state`.
+**Important**: Live orchestration modes (`idle`, `pitch`, `review`) are **not** action states. They are tracked separately in the `event_live_context` table (Ch.19.3.4) and represent transient operational context during active events. Opening or closing a pitch/review assessment does not change the Problem's `current_action_state`.
 
 ---
 
@@ -54,12 +54,12 @@ All state transitions are driven by decisions. The `decision_type_catalog` (Ch.1
 |----------|---------------|-------------------|----------------|
 | **Lifecycle** | `problem_created`, `problem_cloned`, `problem_submitted`, `problem_updated` | Yes | Some |
 | **Quality Gate** | `quality_gate_accepted`, `quality_gate_rejected`, `quality_gate_needs_changes` | Yes | No |
-| **Planning** | `selected_for_meetup`, `deselected_for_meetup` | No | Yes |
+| **Planning** | `selected_for_event`, `deselected_for_event` | No | Yes |
 | **Sprint** | `selected_for_coding`, `deselected_for_coding` | No | Yes |
 | **Deferral** | `deferred_po_absent`, `deferred_low_priority`, `deferred_skipped`, `deferred_too_complex`, `deferred_needs_refinement`, `deferred_future_capability` | No | Yes |
 | **Drop** | `dropped_low_relevance`, `dropped_low_quality` | No | Yes |
 | **Close** | `closed_complete`, `closed_partial` | No | Yes |
-| **Live** | `opened_for_pitch_assessment`, `closed_for_pitch_assessment`, `opened_for_review`, `closed_for_review` | No | No |
+| **Live** | `opened_for_pitch_assessment`, `closed_for_pitch_assessment`, `opened_for_review_assessment`, `closed_for_review_assessment` | No | No |
 
 ### Key Invariants
 
@@ -67,7 +67,7 @@ All state transitions are driven by decisions. The `decision_type_catalog` (Ch.1
 
 2. **Agents cannot bind**: Decisions created by actors with `role = 'agent'` are always `is_binding = false` (Ch.3.5, Ch.10.4).
 
-3. **Comments are separate**: Comments are stored in the `comments` table (Ch.16, Ch.19.3.14), not as decisions. They do not affect state.
+3. **Chat is separate**: Qualitative feedback is stored in the `chat_messages` table (Ch.31), not as decisions. Chat messages do not affect state.
 
 4. **Decisions are append-only**: Decisions are never edited or deleted. State changes are effected by appending new decisions that supersede earlier ones.
 
@@ -77,7 +77,7 @@ All state transitions are driven by decisions. The `decision_type_catalog` (Ch.1
 
 ### Step 1: Problem Creation
 
-A Problem begins in **draft** state. The Problem Owner (PO) creates a Problem (or clones one), receives immutable public/private URLs, and edits the Problem Card. Draft edits are auto-saved but not versioned until submission.
+A Problem begins in **draft** state. The Problem Owner (PO) creates a Problem (or clones one), receives an immutable public URL, and edits the Problem Card. Draft edits are auto-saved but not versioned until submission.
 
 **Decision**: `problem_created` (binding, PO) or `problem_cloned` (binding, PO)
 
@@ -103,7 +103,7 @@ The PO submits the Problem Card. Submission creates **Major Version 1** and lock
 
 Moderators review the submitted Problem. They may:
 
-1. **Leave comments** (stored in `comments` table, no state change)
+1. **Leave feedback in chat** (stored in `chat_messages` table, no state change)
 2. **Request changes**: `quality_gate_needs_changes` (binding) → readiness becomes `needs_changes`
 3. **Reject**: `quality_gate_rejected` (binding) → readiness becomes `rejected`
 4. **Accept**: `quality_gate_accepted` (binding) → readiness becomes `ready`
@@ -146,44 +146,44 @@ The system reflects **what was decided last** while preserving the full decision
 
 ---
 
-## 27.4 Curation Phase: Selecting for Meetup
+## 27.4 Curation Phase: Selecting for Event
 
-After a Problem passes the Quality Gate (or even while still improving), moderators curate which Problems are planned for an upcoming meetup.
+After a Problem passes the Quality Gate (or even while still improving), moderators curate which Problems are planned for an upcoming event.
 
-**Decision**: `selected_for_meetup` (binding, moderator)
+**Decision**: `selected_for_event` (binding, moderator)
 
 **Resulting States**:
-- `current_action_state` → `selected_for_meetup`
+- `current_action_state` → `selected_for_event`
 - `current_readiness_state` unchanged
 
-**Decision**: `deselected_for_meetup` (binding, moderator)
+**Decision**: `deselected_for_event` (binding, moderator)
 
 **Resulting States**:
 - `current_action_state` → `backlog`
 
-This is **distinct from live orchestration**. Selection for meetup is queue/curation; opening a pitch is live orchestration tracked in `meetup_live_context`.
+This is **distinct from live orchestration**. Selection for event is queue/curation; opening a pitch is live orchestration tracked in `event_live_context`.
 
 ---
 
-## 27.5 Live Meetup Phase: Pitch and Review
+## 27.5 Live Event Phase: Pitch and Review
 
 ### Opening a Pitch Assessment
 
-During the meetup, a moderator opens a pitch assessment for a Problem.
+During the event, a moderator opens a pitch assessment for a Problem.
 
 **Decision**: `opened_for_pitch_assessment` (binding, moderator)
 
-**Effect on `meetup_live_context`**:
+**Effect on `event_live_context`**:
 - `current_mode` = `pitch`
 - `current_problem_id` = the Problem being pitched
 
-**Effect on Problem states**: **None**. The Problem's `current_action_state` remains `selected_for_meetup`.
+**Effect on Problem states**: **None**. The Problem's `current_action_state` remains `selected_for_event`.
 
 ### Closing a Pitch Assessment
 
 **Decision**: `closed_for_pitch_assessment` (binding, moderator)
 
-**Effect on `meetup_live_context`**:
+**Effect on `event_live_context`**:
 - `current_mode` = `idle`
 - `current_problem_id` = NULL
 
@@ -203,13 +203,13 @@ If a problem was selected for coding but participants lose interest:
 **Decision**: `deselected_for_coding` (binding, moderator)
 
 **Resulting States**:
-- `current_action_state` → `selected_for_meetup` (not backlog—the problem was presented)
+- `current_action_state` → `selected_for_event` (not backlog—the problem was presented)
 
 ### Opening a Review Assessment
 
-**Decision**: `opened_for_review` (binding, moderator)
+**Decision**: `opened_for_review_assessment` (binding, moderator)
 
-**Effect on `meetup_live_context`**:
+**Effect on `event_live_context`**:
 - `current_mode` = `review`
 - `current_problem_id` = the Problem being reviewed
 
@@ -217,9 +217,9 @@ If a problem was selected for coding but participants lose interest:
 
 ### Closing a Review Assessment
 
-**Decision**: `closed_for_review` (binding, moderator)
+**Decision**: `closed_for_review_assessment` (binding, moderator)
 
-**Effect on `meetup_live_context`**:
+**Effect on `event_live_context`**:
 - `current_mode` = `idle`
 - `current_problem_id` = NULL
 
@@ -235,14 +235,14 @@ Deferral indicates a Problem remains valuable but is **not acted upon now**. All
 
 | Decision Type | Meaning |
 |--------------|---------|
-| `deferred_po_absent` | Problem Owner not available for this meetup |
+| `deferred_po_absent` | Problem Owner not available for this event |
 | `deferred_low_priority` | Lower priority relative to other problems |
 | `deferred_skipped` | Ran out of time, no judgment on problem quality |
 | `deferred_too_complex` | Too complex for current sprint format |
 | `deferred_needs_refinement` | Needs more work before ready for sprint |
 | `deferred_future_capability` | Waiting for tools/skills not yet available |
 
-Deferred problems remain visible in backlog views and can be reactivated via `selected_for_meetup`.
+Deferred problems remain visible in backlog views and can be reactivated via `selected_for_event`.
 
 ### Drop Decisions
 
@@ -250,7 +250,7 @@ Dropping indicates a Problem is **intentionally removed from further considerati
 
 | Decision Type | Meaning |
 |--------------|---------|
-| `dropped_low_relevance` | No longer relevant to meetup goals |
+| `dropped_low_relevance` | No longer relevant to event goals |
 | `dropped_low_quality` | Fundamentally unsuitable, will not continue |
 
 Dropped problems are excluded from default backlog views but remain auditable. The decision and rationale are preserved in the decision history.
@@ -268,10 +268,10 @@ Closure indicates successful completion. All close decisions set `current_action
 
 Even after deferral, drop, or closure, a later binding decision may reactivate a Problem:
 
-**Decision**: `selected_for_meetup` (binding, moderator)
+**Decision**: `selected_for_event` (binding, moderator)
 
 **Resulting States**:
-- `current_action_state` → `selected_for_meetup`
+- `current_action_state` → `selected_for_event`
 
 This demonstrates the system's core property: **decisions are append-only and any state can be superseded by a later binding decision**.
 
@@ -282,10 +282,10 @@ This demonstrates the system's core property: **decisions are append-only and an
 Moderators may operate synchronously or asynchronously. A common asynchronous pattern:
 
 1. **Moderator A** posts a non-binding recommendation:
-   - `selected_for_meetup` with `is_binding = false`
+   - `selected_for_event` with `is_binding = false`
 
 2. **Moderator B** posts the binding decision:
-   - `selected_for_meetup` with `is_binding = true`
+   - `selected_for_event` with `is_binding = true`
 
 The invariant: **recommendations never change state; binding decisions do**.
 
@@ -297,7 +297,7 @@ This pattern applies to all decision types and supports distributed moderation a
 
 1. **Assessments produce data** — Responses are recorded but do not change state.
 
-2. **Comments provide context** — Stored in `comments` table, never change state.
+2. **Chat provides context** — Qualitative feedback stored in `chat_messages` table (Ch.31), never changes state.
 
 3. **Decisions change states** — Only binding decisions update cached states.
 
@@ -307,7 +307,7 @@ This pattern applies to all decision types and supports distributed moderation a
 
 6. **Readiness and action states are orthogonal** — They evolve independently based on different decision categories.
 
-7. **Live context is transient** — Pitch/review modes are tracked in `meetup_live_context`, not in action state.
+7. **Live context is transient** — Pitch/review modes are tracked in `event_live_context`, not in action state.
 
 ---
 
@@ -315,7 +315,7 @@ This pattern applies to all decision types and supports distributed moderation a
 
 - **Chapter 4**: Defines readiness state and action state concepts
 - **Chapter 10**: Defines decisions as first-class entities, binding vs. non-binding semantics
-- **Chapter 11**: Defines meetup model and selection/deferral/drop semantics
+- **Chapter 11**: Defines event model and selection/deferral/drop semantics
 - **Chapter 14**: Defines live interaction modes and their separation from action states
-- **Chapter 16**: Defines comments as separate from decisions
+- **Chapter 31**: Defines team chat as separate from decisions
 - **Chapter 19**: Provides the complete data model including catalog tables and state effect mappings

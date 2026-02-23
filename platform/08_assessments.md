@@ -10,8 +10,8 @@ An **Assessment** is the application of a specific **Inventory** to a specific *
 
 Assessment types are not hardcoded workflows but **semantic conventions** that emerge from how Inventories are used. Typical Assessment types include:
 
-- **Problem Evaluation Assessments**  
-  Used to judge the intrinsic quality and suitability of a Problem (e.g. clarity, structure, complexity, testability). These are commonly used during problem registration, refinement, and moderation.
+- **Problem Evaluation Assessments (Self-Assessment)**
+  Used by Problem Owners to judge the intrinsic quality and suitability of their own Problem (e.g. clarity, structure, complexity, testability). Accessed via the "Self-Rate" button on the Problem Card. Also used by moderators during problem registration and refinement.
 
 - **Pitch Assessments**  
   Used during or immediately after a live pitch. They capture first impressions, perceived value, and suitability for collective work.
@@ -20,10 +20,10 @@ Assessment types are not hardcoded workflows but **semantic conventions** that e
   Used after coding or hacking phases. They focus on correctness, simplicity, elegance, and solution quality relative to the stated problem.
 
 - **Alignment and Strategy Assessments**  
-  Used primarily by moderators or agents to judge alignment with meetup goals (e.g. requirements-driven work, agent orchestration potential).
+  Used primarily by moderators or agents to judge alignment with event goals (e.g. requirements-driven work, agent orchestration potential).
 
 - **Reflection and Lessons-Learned Assessments**  
-  Used post-meetup, often asynchronously, to capture delayed insights, reframed judgments, and experiential learnings.
+  Used post-event, often asynchronously, to capture delayed insights, reframed judgments, and experiential learnings.
 
 The system does not enforce which Inventories may be used in which situations. This openness is intentional: new Assessment types can be introduced without schema changes, simply by defining new Inventories and applying them to Problems.
 
@@ -50,7 +50,7 @@ Item 3    | ☐    | ☐    | ☐    | ☐         | ☐
 **If inconsistent** (future): Multiple sections, each with appropriate render mode
 ```
 [Quality Assessment - 5 point matrix]
-[Cognitive Load - 7 point slider]
+[Engagement Intensity - 10 point slider]
 [Binary decision - Yes/No choice]
 ```
 
@@ -58,14 +58,14 @@ The frontend is a **stateless renderer** that receives the prepared structure an
 
 ---
 
-## 8.3 Assessment Contexts (Pre-Meetup, Pitch, Review, Post-Meetup)
+## 8.3 Assessment Contexts (Pre-Event, Pitch, Review, Post-Event)
 
-Every Assessment is contextualized along a **time-related dimension** that situates it within the lifecycle of a Problem and a meetup.
+Every Assessment is contextualized along a **time-related dimension** that situates it within the lifecycle of a Problem and a event.
 
-Commonly used contexts include (per Chapter 9.5 after reorganization):
+Commonly used contexts include (per Chapter 9.5 Context Orthogonalization):
 
-- **Pre-Meetup**  
-  Assessments conducted before a meetup takes place. These often include self-assessments by Problem Owners, moderator quality gates, or agent-based pre-reviews.
+- **Pre-Event**  
+  Assessments conducted before a event takes place. These often include self-assessments by Problem Owners, moderator quality gates, or agent-based pre-reviews.
 
 - **Pitch**  
   Assessments conducted during or immediately after a live problem pitch. These are typically fast, impression-oriented, and comparable across participants.
@@ -73,16 +73,18 @@ Commonly used contexts include (per Chapter 9.5 after reorganization):
 - **Review**  
   Assessments conducted after active work on a Problem has taken place. These focus on outcomes rather than intentions.
 
-- **Post-Meetup / Late Reflection**  
+- **Post-Event / Late Reflection**  
   Assessments conducted after temporal distance has allowed deeper reflection. These often surface issues not apparent during live interaction.
 
 These contexts are recorded explicitly rather than inferred. This allows the same Inventory to be used across contexts while still enabling clean analytical separation (e.g. comparing pre-pitch vs. post-review ratings).
 
 ---
 
-## 8.3 Engagement and Contextual Metadata
+## 8.4 Engagement and Contextual Metadata
 
 In addition to Item-level responses, Assessments capture **metadata** that qualifies how strongly a given Assessment should be interpreted.
+
+**Authentication requirement**: All responses require mandatory authentication (Chapter 18). Each response is linked to an authenticated user via `user_id NOT NULL` in the responses table. No anonymous or pseudonymous assessment participation is supported.
 
 A key element is **engagement intensity**: a self-reported measure of how deeply the assessor engaged with the Problem. This is typically captured as a final Item in an Inventory and can later be used for:
 
@@ -92,20 +94,20 @@ A key element is **engagement intensity**: a self-reported measure of how deeply
 
 Further contextual metadata includes:
 
-- **Role at the time of assessment**
-  (one of seven roles: `observer`, `developer`, `coding_partner`, `problem_owner`, `moderator`, `admin`, `agent`)
+- **Authenticated user and role**
+  Each response captures the user's ID and their role at submission time (one of seven roles: `observer`, `developer`, `coding_partner`, `problem_owner`, `moderator`, `admin`, `agent`)
 
-- **Participation mode**  
+- **Participation mode**
   (in-presence vs. remote)
 
-- **Temporal markers**  
-  Precise timestamps and meetup references that situate the Assessment within the broader event timeline.
+- **Temporal markers**
+  Precise timestamps and event references that situate the Assessment within the broader event timeline.
 
 Crucially, this metadata does not modify the meaning of individual Item responses. Instead, it provides the necessary structure to interpret them responsibly.
 
 ---
 
-## 8.4 Longitudinal and Cross-Version Analysis
+## 8.5 Longitudinal and Cross-Version Analysis
 
 One of the primary motivations for the Assessment model is to enable **longitudinal analysis** across time, versions, and contexts.
 
@@ -122,7 +124,7 @@ it becomes possible to analyze trajectories such as:
 - How pitch impressions differ from post-review judgments.
 - Whether repository evolution (captured via minor version hashes) correlates with evaluation shifts.
 
-Assessments are never overwritten. New Assessments accumulate alongside older ones, forming a dense evaluative history. This makes the system suitable not only for operational meetup coordination, but also for:
+Assessments are never overwritten. New Assessments accumulate alongside older ones, forming a dense evaluative history. This makes the system suitable not only for operational event coordination, but also for:
 
 - studying human–AI collaboration dynamics,
 - evaluating agent-assisted problem refinement,

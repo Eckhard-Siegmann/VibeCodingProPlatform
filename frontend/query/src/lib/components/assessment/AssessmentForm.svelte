@@ -4,8 +4,7 @@
 	import MatrixTable from './MatrixTable.svelte';
 	import ProgressIndicator from './ProgressIndicator.svelte';
 	import SubmitSection from './SubmitSection.svelte';
-	import Separator from '$lib/components/ui/Separator.svelte';
-	import Card from '$lib/components/ui/Card.svelte';
+	import { Card } from '$lib/components/ui/card';
 	import { responsesStore, answeredCount, canSubmit } from '$lib/stores/responses';
 	import { sessionStore } from '$lib/stores/session';
 	import type { Matrix, Role, TimeContext } from '$lib/utils/validators';
@@ -85,8 +84,8 @@
 </script>
 
 {#if submitted}
-	<!-- Success state -->
-	<Card class="text-center py-8">
+	<!-- Success state with card elevation for emphasis -->
+	<Card elevation="resting" class="text-center py-8">
 		<div class="text-success text-5xl mb-4">&#10003;</div>
 		<h2 class="text-xl font-semibold text-headers mb-2">Assessment Submitted</h2>
 		<p class="text-labels">
@@ -94,32 +93,36 @@
 		</p>
 	</Card>
 {:else}
-	<form onsubmit={(e) => e.preventDefault()}>
-		<!-- Role selection -->
-		<RoleSelector value={role} onchange={handleRoleChange} disabled={submitting} />
+	<!-- Form wrapped in Card for depth on canvas -->
+	<Card elevation="resting">
+		<form onsubmit={(e) => e.preventDefault()}>
+			<!-- Role selection -->
+			<RoleSelector value={role} onchange={handleRoleChange} disabled={submitting} />
 
-		<Separator />
+			<!-- Divider using spacing instead of Separator (shadows-only approach) -->
+			<div class="py-4"></div>
 
-		<!-- Progress indicator -->
-		<ProgressIndicator {answered} total={totalItems} class="mb-6" />
+			<!-- Progress indicator -->
+			<ProgressIndicator {answered} total={totalItems} class="mb-6" />
 
-		<!-- Rating matrix -->
-		<MatrixTable {matrix} {responses} disabled={submitting || !role} onresponse={handleResponse} />
+			<!-- Rating matrix -->
+			<MatrixTable {matrix} {responses} disabled={submitting || !role} onresponse={handleResponse} />
 
-		<!-- Error message -->
-		{#if error}
-			<div class="mt-4 p-3 bg-alert/10 border border-alert/30 rounded-lg text-alert text-sm">
-				{error}
-			</div>
-		{/if}
+			<!-- Error message -->
+			{#if error}
+				<div class="mt-4 p-3 bg-alert/10 border border-alert/30 rounded-lg text-alert text-sm">
+					{error}
+				</div>
+			{/if}
 
-		<!-- Submit section -->
-		<SubmitSection
-			canSubmit={submitEnabled}
-			{submitting}
-			answeredCount={answered}
-			totalCount={totalItems}
-			onsubmit={handleSubmit}
-		/>
-	</form>
+			<!-- Submit section -->
+			<SubmitSection
+				canSubmit={submitEnabled}
+				{submitting}
+				answeredCount={answered}
+				totalCount={totalItems}
+				onsubmit={handleSubmit}
+			/>
+		</form>
+	</Card>
 {/if}

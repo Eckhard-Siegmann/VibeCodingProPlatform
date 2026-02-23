@@ -6,7 +6,7 @@ This addendum captures functional and non-functional requirements clarified thro
 
 ## Problem Statement
 
-The base specification (25 chapters) provides comprehensive conceptual architecture but leaves certain operational behaviors, failure modes, and implementation constraints underspecified. With the first meetup in ~2 days, these gaps could cause implementation ambiguity or runtime failures.
+The base specification (25 chapters) provides comprehensive conceptual architecture but leaves certain operational behaviors, failure modes, and implementation constraints underspecified. With the first event in ~2 days, these gaps could cause implementation ambiguity or runtime failures.
 
 ## Objective
 
@@ -35,10 +35,10 @@ A: Proceed without minor version. Assessment stored with NULL minor_version; gra
 **Q: If a Moderator account is compromised and malicious binding decisions are made, what's the recovery?**
 A: Decisions are irrevocable. Append-only is absolute. Recovery via new "reversal" decisions only; original preserved for audit.
 
-**Q: If email delivery fails for Problem Owner private URL?**
-A: No recovery path. User's responsibility to provide correct email. Clone as workaround if needed.
+**Q: If email delivery fails for notification emails?**
+A: No recovery path. User's responsibility to provide correct email during registration. Email can be updated in account settings.
 
-**Q: If participant clears browser storage mid-meetup, losing session identity?**
+**Q: If participant clears browser storage mid-event, losing session identity?**
 A: Accept data loss. Statistical pairing is nice-to-have; losing some pairs is acceptable.
 
 ### Theme 2: Performance & Operational Constraints
@@ -46,8 +46,8 @@ A: Accept data loss. Statistical pairing is nice-to-have; losing some pairs is a
 **Q: Latency target for assessment submission during live pitch (50 concurrent users)?**
 A: Best effort. No specific latency requirement; eventual consistency sufficient.
 
-**Q: Backup strategy for SQLite during first meetup?**
-A: Manual file copy before meetup starts. Accept data loss risk for MVP; improve later.
+**Q: Backup strategy for SQLite during first event?**
+A: Manual file copy before event starts. Accept data loss risk for MVP; improve later.
 
 ### Theme 3: Data Model & Schema
 
@@ -71,7 +71,7 @@ A: **INSERT + supersede model**. New row inserted; previous row marked supersede
 A: Always show all stats with N displayed. User interprets validity. No hiding based on sample size.
 
 **Q: Scale sizes (Ch.7.3 specifies 1,2,3,5,7,10). Can new sizes be added?**
-A: **Yes, extensible**. Add new max_rating values as needed. UI must be tested for responsive rendering on desktop, mobile, tablet for any new scale size.
+A: **Yes, extensible**. Add new max_rating values as needed. UI must be tested for responsive rendering on desktop, mobile, tablet for any new scale size. Current implementation uses sliders for max_rating > 5 (see ItemRow.svelte line 38).
 
 ### Theme 4: Behavioral Rules & Constraints
 
@@ -84,8 +84,8 @@ A: Use closest match from existing enum + detailed rationale in comment field. N
 **Q: Problem Card content validation on submission?**
 A: **Moderator judgment only**. No automated validation; required fields non-empty, URL format valid, no length requirements.
 
-**Q: Who assigns which Inventories are available for meetup contexts?**
-A: **Admin configures globally**. Moderators use system defaults; cannot override per-meetup.
+**Q: Who assigns which Inventories are available for event contexts?**
+A: **Admin configures globally**. Moderators use system defaults; cannot override per-event.
 
 ### Theme 5: Agent Integration
 
@@ -98,7 +98,7 @@ A: **Service account with JWT/token**. Agent has user record with special auth; 
 A: Future scope. System captures data; comparison analysis done outside platform for now.
 
 **Q: Tooling capture in database?**
-A: Future scope. Agents will mine PR descriptions later. Manual inspection for first meetup.
+A: Future scope. Agents will mine PR descriptions later. Manual inspection for first event.
 
 ---
 
@@ -114,15 +114,19 @@ A: Future scope. Agents will mine PR descriptions later. Manual inspection for f
 
 ## Tech Stack Decision
 
-**Decision: Next.js 14 (App Router) + shadcn/ui + Drizzle ORM**
+> **SUPERSEDED**: This section documents the initial tech stack decision made during the 2026-01-28 interview. The tech stack was subsequently updated to **SvelteKit 2.x + Tailwind CSS 4.x**. See **Chapter 26 (UI Specification Addendum), Section 26.8** for the current authoritative tech stack decision and rationale.
 
-**Rationale:**
+~~**Decision: Next.js 14 (App Router) + shadcn/ui + Drizzle ORM**~~
+
+**Current Decision: SvelteKit 2.x + Tailwind CSS 4.x** (per Chapter 26)
+
+**Original Rationale (historical):**
 - shadcn/ui has excellent responsive form components (RadioGroup, Slider) for survey rendering
 - Drizzle ORM works with both SQLite (MVP) and PostgreSQL (production) with same code
 - 2-day timeline requires component assembly, not custom building
 - Static export possible for traditional hosting on Andreas's webserver
 
-**Critical UI requirement:** Survey elements must render ergonomically and beautifully on arbitrary devices. Test all scale sizes (1,2,3,5,7,10, plus any new sizes) for responsive behavior.
+**Critical UI requirement (still valid):** Survey elements must render ergonomically and beautifully on arbitrary devices. Test all scale sizes (1,2,3,5,7,10, plus any new sizes) for responsive behavior.
 
 ---
 
@@ -195,6 +199,135 @@ The `items.max_rating` column should accept any positive integer, not be constra
 
 ---
 
+## 25.4 Error Prevention and Recovery Patterns
+
+The platform should handle errors gracefully, guiding users toward resolution rather than leaving them stranded.
+
+### 25.4.1 Graceful Degradation Messages
+
+When errors occur, show **user-facing guidance**, not technical errors:
+
+| Error Type | User-Facing Message |
+|------------|---------------------|
+| GitHub API unavailable | "Repository status couldn't be verified. Your submission is saved — we'll check the repo later." |
+| Email delivery failed | "We couldn't send the email. Please check your email address in settings." |
+| Assessment closed during submission | "The assessment just closed. Your response couldn't be recorded — the moderator may reopen it." |
+| Network error during save | "Connection lost. We'll retry automatically when you're back online." |
+| Session expired | "Your session expired. Please log in again to continue." |
+
+### 25.4.2 Draft Auto-Save and Recovery
+
+For long-form content (problem descriptions, lessons learned), implement auto-save:
+
+**Auto-Save Behavior:**
+- Save draft every 30 seconds while user is editing
+- Save on blur (when user clicks away)
+- Save before navigation (with confirmation if unsaved)
+
+**Recovery Prompt:**
+```
+Welcome back!
+
+We found an unsaved draft for "API Rate Limiter"
+Last edited: 2 minutes ago
+
+[Restore draft] [Discard draft]
+```
+
+**Implementation:**
+- Store drafts in localStorage (client-side)
+- Expire drafts after 7 days
+- Clear draft on successful submission
+
+### 25.4.3 Confirmation Dialogs
+
+For destructive or significant actions, require confirmation:
+
+| Action | Confirmation Dialog |
+|--------|---------------------|
+| Delete problem | "Delete '{Title}'? This cannot be undone. All versions, chat, and assessments will be lost." |
+| Retire from team | "Leave this team? You can rejoin later, but you'll need to re-accept the challenge." |
+| Drop problem | "Drop '{Title}' from consideration? It will be marked as dropped and won't be selected for future events." |
+| Reject problem | "Reject '{Title}'? The Problem Owner will be notified. Consider 'Request Changes' instead if refinement is possible." |
+
+**Design:**
+- Confirmation dialogs are modal (block other actions)
+- Destructive action button is visually distinct (red)
+- Include "Cancel" as the default/safe option
+- Don't show for reversible actions (selecting, deselecting)
+
+### 25.4.4 Proactive Validation Patterns
+
+Catch errors before submission:
+
+**Problem Submission:**
+```
+Pre-Submission Check
+────────────────────
+✓ Title is clear and concise
+✓ Description explains the challenge
+⚠️ Repository URL: returns 404 — is it public?
+✓ At least one acceptance criterion defined
+
+[Submit anyway] [Fix issues first]
+```
+
+**URL Validation:**
+- Check format immediately on input
+- Verify accessibility via HEAD request (non-blocking)
+- Warn if URL returns error, but allow submission
+
+**Email Validation:**
+- Format validation on input
+- Domain check (warn if uncommon domain)
+- No real-time delivery verification (privacy concern)
+
+### 25.4.5 Error Recovery Flows
+
+When things go wrong, guide users toward resolution:
+
+**Problem rejected:**
+```
+Your problem was rejected
+─────────────────────────
+
+Moderator feedback:
+"The problem description doesn't clearly explain what needs to be built.
+ Consider adding specific acceptance criteria."
+
+Options:
+• [Create new version] — Revise and resubmit
+• [Clone as new problem] — Start fresh with a new problem
+• [Contact moderator] — Ask questions in chat
+```
+
+**Assessment failed to save:**
+```
+Oops! We couldn't save your response
+────────────────────────────────────
+
+What happened:
+The assessment closed while you were responding.
+
+Your responses were:
+• Clarity: 4/5
+• Complexity: 3/5
+(saved locally)
+
+Options:
+• [Copy to clipboard] — Save your responses for later
+• Ask the moderator to reopen the assessment
+```
+
+### 25.4.6 Offline Support (Future Direction)
+
+**Not MVP scope**, but captured for future:
+- Service worker for offline access to problem cards
+- Queue submissions when offline, sync when online
+- "Offline mode" indicator in header
+
+---
+
 ## Relationship to Base Specification
 
 This addendum **refines** but does not contradict Chapter 1 (Purpose, Scope, Design Principles). Key alignments:
@@ -203,12 +336,88 @@ This addendum **refines** but does not contradict Chapter 1 (Purpose, Scope, Des
 - INSERT + supersede preserves "Immutability over Mutation" (no data deleted)
 - Accept data loss for session aligns with "Minimal Trust, Maximum Traceability" (we trace what we can)
 - VARCHAR + FK aligns with "Future-proofing" principle from Ch.19.1
+- Error prevention aligns with "Human-Centered First" (reduce cognitive load)
 
 **Ch.19 (Data Model) requires updates** to reflect:
 - Reference table pattern for enums
 - Responses supersession model
 - Scale size extensibility
 
+**Related Chapters:**
+- **Chapter 13**: Problem Card includes validation feedback
+- **Chapter 32**: First-time user flows include error guidance
+- **Chapter 33**: Error recovery framed as encouragement, not judgment
+
 ---
 
-*This addendum captures interview decisions made 2026-01-28. Implementation should treat these as authoritative refinements to the base specification.*
+## 25.5 Template & Mobile Design Session (2026-02-05)
+
+**Context**: Following initial implementation by 7 Opus agents, design session resolved 24 template decisions and reinforced mobile-first requirements.
+
+### Decisions Made
+
+**Dialog System** (3 types):
+- ConfirmDialog: Yes/no decisions (existing)
+- FormDialog: Dialogs with form inputs (NEW)
+- InfoDialog: Read-only help content (NEW)
+
+**Empty States**: Generic EmptyState component + domain config objects in `lib/config/empty-states.ts`
+
+**Feedback UI**: Toast notification system (corner popups, auto-dismiss) replacing inline success states
+
+**Loading UI**: LoadingSpinner + Skeleton screens (SkeletonCard, SkeletonList, SkeletonText)
+
+**Form Inputs**: shadcn-svelte style components (Select, Checkbox, DatePicker, TimePicker, FileUpload)
+
+**Data Tables**: Responsive (desktop=table, mobile=cards via DataTable component)
+
+**Help System**: Two-tier (Tooltip for hints, InfoPanel for explanations)
+
+**Separators**: Etched 3D separator UN-DEPRECATED for major page sections (not for component-internal use)
+
+**Navigation**: BackButton component for hierarchical navigation
+
+**Filters**: FilterBar (desktop inline, mobile bottom sheet)
+
+**List Actions**: Three-dot ActionMenu (⋮) for per-item actions
+
+**Badge Sizes**: Two sizes (default for states, large for classification)
+
+**Date Formatting**: Utility functions (formatDate, formatTime, formatRelative)
+
+**Chat Style**: Bubble UI (own=right/blue, others=left/white)
+
+**Countdown Timers**: Visual escalation + optional audio (user preference)
+
+**Collapsible Sections**: Problem Card sections collapse on mobile
+
+### Mobile Admin Reinforcement
+
+Session reinforced absolute requirement for smartphone compatibility:
+- All admin interfaces must work on 375px viewport
+- No "desktop-only" language permitted
+- Testing requirement: All admin functions verified on iPhone SE
+- Patterns: Vertical scroll, accordion organization, wizard flows, table→card transforms
+
+### Implementation Impact
+
+- 37 new components specified
+- 11 new pages created
+- 5 utility files added
+- 2 store files added
+- ~60 lines CSS additions
+- All components built by parallel Opus agents following specifications
+
+### Specification Updates Required
+
+This session revealed need for:
+- Complete all 18 chapter updates (5 done, 13 pending)
+- Create 6 page design documents (0 done, 6 needed)
+- Update Template Collection (not done)
+- Migrate database schema for audio preferences
+
+See Quality Assurance Report 2026-02-05 for complete issue list and remediation plan.
+
+---
+
+*This addendum captures interview decisions made 2026-01-28 and template design decisions made 2026-02-05. Implementation should treat these as authoritative refinements to the base specification.*

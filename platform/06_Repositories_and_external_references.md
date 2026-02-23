@@ -4,15 +4,34 @@ This chapter defines how **external technical artifacts**, in particular source 
 
 ---
 
-## 6.1 Primary Repository Constraints and Assumptions
+## 6.1 Repository and Resource Model
 
-Each Problem is associated with **exactly one primary repository**, which is assumed to be the canonical technical artifact representing the problem’s implementation context.
+Each Problem maintains **resource lists** that link to external technical artifacts, with the primary repository being the canonical implementation artifact.
 
-Key constraints and assumptions:
+### Resource Types
 
-- The primary repository **must be a GitHub repository URL**.
-- The URL is stored as a normalized, immutable reference per Problem version.
-- The system does **not** clone, fork, or modify repositories.
+Problems maintain two distinct resource lists (stored in the `problem_resources` table, see Chapter 4.2):
+
+**Direct Resources** (`resource_type = 'direct'`):
+- The problem's own repository (typically GitHub, required)
+- Related specifications or documentation
+- Test suites or validation tools
+- Resources essential for understanding/solving the problem
+
+**Helpful Artifacts** (`resource_type = 'helpful'`):
+- Reference implementations
+- Similar projects for inspiration
+- Learning resources
+- Tools and libraries that may help
+
+### Repository Constraints and Assumptions
+
+While the system supports multiple resources, the **primary repository** (the problem's own codebase) has specific constraints:
+
+- The primary repository **should be a GitHub repository URL** for optimal integration
+- Other Git platforms (GitLab, Bitbucket) are accepted but may have limited snapshot support
+- The URL is stored as a normalized reference in the `problem_resources` table
+- The system does **not** clone, fork, or modify repositories
 - The system makes **no assumptions** about:
   - programming language
   - framework
@@ -20,45 +39,54 @@ Key constraints and assumptions:
   - test setup
   - CI/CD configuration
 
-The repository is treated as a *black box* whose internal evolution is outside the system’s control. All interaction is therefore observational, not operational.
+Repositories are treated as *black boxes* whose internal evolution is outside the system's control. All interaction is therefore observational, not operational.
 
 Rationale:
-- Keeps the system **LLM-, framework-, and toolchain-agnostic**.
-- Avoids credential handling, webhooks, or write permissions.
-- Ensures the system remains usable even if repositories are private, temporarily unavailable, or structurally unconventional.
+- Keeps the system **LLM-, framework-, and toolchain-agnostic**
+- Avoids credential handling, webhooks, or write permissions
+- Ensures the system remains usable even if repositories are private, temporarily unavailable, or structurally unconventional
+- Supports collaborative resource curation through team contributions
 
-From a conceptual perspective, the repository answers:
-> “Where does the code live that this Problem refers to?”
+From a conceptual perspective, the resource lists answer:
+> "Where does the code live, and what supporting materials exist?"
 
-It does **not** answer:
-> “What exactly is the code?” or “How is it built?”
+They do **not** answer:
+> "What exactly is the code?" or "How is it built?"
 
 Those questions remain intentionally external.
 
 ---
 
-## 6.2 Secondary URLs and Supporting Materials
+## 6.2 Resource Management and Permissions
 
-In addition to the primary repository, a Problem may optionally reference **one secondary URL**.
+Resources are managed collaboratively with role-based permissions (see Chapter 4.2):
 
-Typical use cases include:
-- documentation sites
-- design documents
-- demo deployments
-- issue trackers
-- whitepapers or technical blog posts
+| Actor | Direct Resources | Helpful Artifacts |
+|-------|-----------------|-------------------|
+| Problem Owner | Add/Edit | Add/Edit |
+| Team Members | Add/Edit | Add/Edit |
+| Moderators | Add (auto-approved) | Add (auto-approved) |
+| Observers | Suggest (PO approves) | Suggest (PO approves) |
 
-Constraints:
-- The secondary URL is optional.
-- It is not semantically interpreted by the system.
-- It is displayed as-is on the Problem Card.
-- It is never required for submission or evaluation.
+### Resource Approval Workflow
 
-The system does not attempt to classify or validate the content of secondary URLs. Their purpose is purely *contextual enrichment* for human participants.
+- Resources added by Problem Owners, team members, and moderators are **auto-approved**
+- Resources suggested by observers require Problem Owner approval
+- Approved resources appear immediately on the Problem Card
+- Pending suggestions are visible to the Problem Owner with approve/reject controls
+
+This collaborative model enables:
+- Team members to share helpful references during sprints
+- Moderators to suggest high-quality resources
+- Community participation while maintaining Problem Owner curation authority
+
+The system does not attempt to classify or deeply validate resource URLs beyond format checking. Their purpose is *contextual enrichment* for participants.
 
 This design choice reflects a deliberate balance:
-- Enough flexibility to support diverse workflows.
-- Enough restraint to avoid turning the system into a document management platform.
+- Enough flexibility to support diverse workflows and collaborative resource discovery
+- Enough restraint to avoid turning the system into a document management platform
+
+**Note on Traceability**: Resource additions, suggestions, and approvals are tracked in the `problem_resources` table with timestamps and actor attribution (`added_by_user_id`, `approved_by_user_id`), but they do NOT create entries in the decisions table. Resource management represents collaborative content curation rather than binding state transitions. For decision-based state changes, see Chapter 10.
 
 ---
 
@@ -131,7 +159,7 @@ The **PR description** is the canonical place for this information. A suggested 
 
 ### Rationale
 
-The meetup's core comparison is "one human with an orchestrated multi-agent system" versus alternative approaches (Introduction, Ch.0). Without tooling documentation, this comparison is impossible to make meaningfully.
+The event's core comparison is "one human with an orchestrated multi-agent system" versus alternative approaches (Introduction, Ch.0). Without tooling documentation, this comparison is impossible to make meaningfully.
 
 The system deliberately **does not capture tooling data in its database**. The repository (via PR) remains the single source of truth for implementation artifacts. This keeps the system simple while enabling rich comparative analysis through the PRs themselves.
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/Button.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import LoadingSpinner from '$lib/components/ui/LoadingSpinner.svelte';
 
 	interface Props {
@@ -25,7 +25,7 @@
 	<div class="flex flex-col sm:flex-row gap-3 items-center">
 		<Button
 			type="button"
-			variant="primary"
+			variant="default"
 			size="lg"
 			fullWidth
 			disabled={!canSubmit || submitting}

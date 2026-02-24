@@ -25,6 +25,8 @@ Produce implementation-ready requirements for:
 | 1, 2, 3, 5, 7 | **Button scale** | Discrete choices with semantic labels; higher accessibility |
 | 10 | **Continuous slider** | Anti-anchoring for pre/post intrapersonal testing |
 
+**Critical UI requirement**: Survey elements must render ergonomically and beautifully on arbitrary devices. All scale sizes (1, 2, 3, 5, 7, 10, plus any new sizes) must be tested for responsive behavior on desktop, mobile, and tablet.
+
 ### Design Decision: Continuous Slider for 10-Point Scales
 
 **Rationale**: For longitudinal assessments (e.g., pitch vs. review, pre/post comparisons), a continuous slider prevents anchoring bias. Users cannot easily recall their previous numeric selection because they only see position, not number. This improves validity of intrapersonal pre/post testing.
@@ -384,56 +386,16 @@ Where `valueText` provides semantic context:
 
 ---
 
-## 26.8 Tech Stack Decision
+## 26.8 Technology Stack
 
-**Decision: SvelteKit 2.x + Tailwind CSS 4.x**
-
-This updates the tech stack decision from Chapter 25 (Next.js 14 + shadcn/ui) based on further evaluation.
-
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Framework | **SvelteKit 2.x** | Lighter weight, excellent DX, built-in SSR, growing ecosystem |
-| Styling | **Tailwind CSS 4.x** | Utility-first, responsive breakpoints (`sm:`, `md:`, `lg:`) |
-| Accessible primitives | **Melt UI** or **Bits UI** | Headless components for Svelte with full ARIA support |
-| Form handling | **Superforms + Zod** | Progressive enhancement, validation |
-| Database | SQLite (dev) → PostgreSQL (prod) | Per Chapter 25 |
-| ORM | **Drizzle** or **Kysely** | Type-safe queries, works with both databases |
-
-### 26.8.1 Component Architecture
-
-```
-src/lib/components/
-├── rating/
-│   ├── RatingItem.svelte        # Dispatcher: selects scale type by max_rating
-│   ├── ButtonScale.svelte       # max_rating ≤ 7
-│   ├── ContinuousSlider.svelte  # max_rating = 10
-│   └── ScaleLabel.svelte        # Endpoint label component
-├── assessment/
-│   ├── AssessmentForm.svelte    # Full inventory form
-│   ├── ItemCard.svelte          # Card wrapper per item
-│   └── ProgressIndicator.svelte # Items answered / total
-└── ui/
-    ├── Button.svelte
-    └── Card.svelte
-```
-
-### 26.8.2 Scale Selection Logic
-
-```svelte
-<!-- RatingItem.svelte -->
-{#if item.max_rating <= 7}
-  <ButtonScale {item} bind:value />
-{:else}
-  <ContinuousSlider {item} bind:value />
-{/if}
-```
+The technology stack and component architecture conventions are documented in ADR 002 (Frontend Technology Stack) and ADR 003 (Component System Architecture).
 
 ---
 
 ## 26.9 Data Flow
 
 1. **Render**: Fetch inventory → items via `item_key` → resolve to active `item_id`
-2. **Capture**: User interacts → local Svelte store updates
+2. **Capture**: User interacts → local client-side state updates
 3. **Submit**: Form action → validate → INSERT into `responses` table
 4. **Supersession**: If re-rating while assessment open, previous response marked `superseded_at`
 
@@ -460,60 +422,27 @@ This addendum **extends** Chapters 12-15 (UI specifications) with concrete imple
 - Chapter 15 (Results & Analytics): Aggregations operate on integer values stored by these components
 
 This addendum **updates** Chapter 25 (Tech Stack Decision):
-- Original: Next.js 14 + shadcn/ui
-- Updated: SvelteKit 2.x + Tailwind CSS + Melt UI
+- Technology stack decisions are now documented in ADR 002 and ADR 003
 
 ---
 
-## 26.11 Component System: shadcn-svelte
+## 26.11 Component System
 
-**Added 2026-02-04**: The platform uses a shadcn-svelte inspired component architecture built on bits-ui primitives with custom styling that aligns with the design system.
+**Added 2026-02-04**: The platform uses a component architecture with three layers:
+
+1. **Primitive components** (`ui/`): Foundational building blocks (Card, Badge, Button, AlertDialog, etc.) built on accessible headless primitives with custom styling aligned to the design system.
+2. **Domain components** (`rating/`, `assessment/`, `problem/`, `dashboard/`, `moderation/`): Composed from primitives for specific domain concerns.
+3. **Page compositions** (`routes/`): Full page layouts assembling domain components with data loading and state management.
+
+For implementation details (directory structure, import conventions, dependencies, and the `cn()` utility), see ADR 003 (Component System Architecture).
 
 ### 26.11.1 Architecture Overview
 
-```
-src/lib/
-├── utils.ts                    # cn() utility (clsx + tailwind-merge)
-├── components/
-│   ├── ui/                     # Primitive components (shadcn-style)
-│   │   ├── card/               # Card family
-│   │   │   ├── card.svelte
-│   │   │   ├── card-header.svelte
-│   │   │   ├── card-title.svelte
-│   │   │   ├── card-content.svelte
-│   │   │   ├── card-footer.svelte
-│   │   │   └── index.ts        # Barrel export
-│   │   ├── badge/              # Badge component
-│   │   │   ├── badge.svelte
-│   │   │   └── index.ts
-│   │   ├── button/             # Button component
-│   │   │   ├── button.svelte
-│   │   │   └── index.ts
-│   │   ├── alert-dialog/       # AlertDialog (bits-ui based)
-│   │   │   ├── alert-dialog-*.svelte
-│   │   │   └── index.ts
-│   │   ├── ConfirmDialog.svelte    # High-level confirmation modal
-│   │   ├── LoadingSpinner.svelte   # Loading indicator
-│   │   └── Separator.svelte        # DEPRECATED: Use spacing + shadows
-│   ├── layout/                 # Page layout components
-│   ├── rating/                 # Rating scale components
-│   ├── assessment/             # Assessment form components
-│   └── problem/                # Problem Card components
-```
+Components use barrel exports for clean imports. Each component family is organized as a folder with an index module that re-exports all sub-components as named exports.
 
-### 26.11.2 Import Pattern
+### 26.11.2 Import Convention
 
-Components use barrel exports with named imports:
-
-```svelte
-<!-- Preferred: Named imports from index -->
-import { Card, CardHeader, CardTitle } from '$lib/components/ui/card';
-import { Badge } from '$lib/components/ui/badge';
-import { Button } from '$lib/components/ui/button';
-
-<!-- High-level components: Direct import -->
-import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
-```
+Components use barrel exports for clean imports. See ADR 003 for import patterns and conventions.
 
 ### 26.11.3 Card Component
 
@@ -628,41 +557,9 @@ AlertDialog provides accessible modal dialogs for confirmations and alerts. Buil
 
 **Shadows for depth, not separators**: The design system uses shadow elevation to establish visual hierarchy rather than separator lines. This creates a cleaner, more modern appearance.
 
-**Spacing rhythm**: Consistent `space-y-4` or `space-y-6` between sections provides visual breathing room.
+**Spacing rhythm**: Consistent spacing between sections provides visual breathing room.
 
-**Color tokens**: All components use CSS custom properties defined in `app.css`:
-- `--color-card`, `--color-canvas`, `--color-viewport` — Background layers
-- `--color-primary`, `--color-primary-hover` — Interactive elements
-- `--color-headers`, `--color-labels`, `--color-meta` — Typography
-- `--color-success`, `--color-alert`, `--color-warning`, `--color-pending` — Status
-
-### 26.11.8 cn() Utility
-
-The `cn()` utility merges CSS classes with Tailwind conflict resolution:
-
-```typescript
-// src/lib/utils.ts
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-```
-
-Usage in components:
-```svelte
-<div class={cn('base-class', condition && 'conditional-class', className)}>
-```
-
-### 26.11.9 Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `bits-ui` | Headless accessible primitives (AlertDialog, etc.) |
-| `clsx` | Conditional class joining |
-| `tailwind-merge` | Tailwind class conflict resolution |
-| `@lucide/svelte` | Icon library |
+**Color tokens**: All components use design tokens for background layers, interactive elements, typography, and status indicators. See ADR 003 for the specific token names.
 
 ---
 
@@ -1093,12 +990,11 @@ export function getAvatarColor(userId: string): string
 
 **File**: `ui/accordion-section/AccordionSection.svelte`
 
-### 26.11.21 Chart Components (via Chart.js)
+### 26.11.21 Chart Components
 
-**Added 2026-02-05**: Visualizations for results and analytics using Chart.js library (Decision #22).
+**Added 2026-02-05**: Visualizations for results and analytics (Decision #22).
 
-**Library**: Chart.js 4.x (installed in package.json, no Svelte wrapper)
-**Implementation**: Svelte components that wrap Chart.js with lifecycle management
+The charting library selection is documented in ADR 003. Components wrap the library with framework lifecycle management.
 
 **BarChart.svelte**:
 - Props: `data`, `labels`, `options`, `height` (optional)

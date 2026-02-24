@@ -31,9 +31,9 @@ The platform supports three authentication methods:
 
 | Method | Use Case | Implementation |
 |--------|----------|----------------|
-| **Local (Email + Password)** | Default for all users | Password stored as secure hash |
-| **GitHub OAuth** | Convenient for developers | Uses GitHub ID for identity |
-| **LinkedIn OAuth** | Professional networking context | Uses LinkedIn ID for identity |
+| **Local (Email + Password)** | Default for all users | Secure hash storage |
+| **OAuth (developer platform)** | Convenient for developers | See ADR 004 |
+| **OAuth (professional platform)** | Professional networking context | See ADR 004 |
 
 Users choose their method at registration. OAuth users do not need to manage passwords.
 
@@ -55,7 +55,7 @@ For local (email + password) authentication, passwords must meet these criteria:
 
 ### Password Storage
 
-- Passwords stored as **secure hashes** (bcrypt or Argon2)
+- Passwords stored as **secure hashes** using an industry-standard adaptive hashing algorithm (see ADR 004)
 - No plaintext storage
 - No reversible encryption
 - Hash includes per-user salt
@@ -120,31 +120,23 @@ Users who forget their password can request a reset:
 
 ## 18.4 OAuth Integration
 
-### GitHub OAuth
+The specific OAuth providers are documented in ADR 004 (Authentication Providers).
 
-For developers who prefer GitHub authentication:
+### OAuth Flow
 
-1. User clicks "Sign in with GitHub"
-2. Redirected to GitHub authorization page
+For users who prefer OAuth authentication, both supported providers follow the same flow:
+
+1. User clicks "Sign in with {Provider}"
+2. Redirected to provider's authorization page
 3. User grants access
-4. System receives GitHub user ID and email
-5. If email exists in system: link GitHub ID to existing account
-6. If email is new: create account with GitHub as auth provider
+4. System receives provider user ID and email
+5. If email exists in system: link provider ID to existing account
+6. If email is new: create account with provider as auth method
 7. User is logged in
-
-### LinkedIn OAuth
-
-For professionals who prefer LinkedIn authentication:
-
-1. User clicks "Sign in with LinkedIn"
-2. Redirected to LinkedIn authorization page
-3. User grants access
-4. System receives LinkedIn user ID and email
-5. Same account linking/creation logic as GitHub
 
 ### OAuth Account Linking
 
-- An existing local account can be linked to GitHub/LinkedIn
+- An existing local account can be linked to one or both OAuth providers
 - If OAuth email matches existing account, accounts are merged
 - Users can have multiple OAuth providers linked
 - OAuth users can optionally set a local password as backup
@@ -367,7 +359,7 @@ The system assumes:
 - A **benign community** of professional practitioners
 - Primary risk is **accidental misuse**, not hostile intrusion
 - No highly sensitive personal data beyond email addresses
-- OAuth providers (GitHub, LinkedIn) provide identity verification
+- OAuth providers provide identity verification (see ADR 004)
 
 ### Security Philosophy
 
@@ -500,3 +492,53 @@ Based on contribution history, show experience level:
 - **Chapter 31**: Team chat — chat participation requires authentication
 - **Chapter 32**: Onboarding — first-time user guidance
 - **Chapter 33**: Contributor recognition — points and stars system
+
+---
+
+## 18.14 API Endpoint Authorization
+
+Every API endpoint MUST enforce authorization before processing requests. This section defines the authorization contract for the frontend's server-side API routes.
+
+### 18.14.1 Authorization Levels
+
+| Level | Applies To | Requirement |
+|-------|-----------|-------------|
+| **Authenticated** | All endpoints | Valid user identity (session cookie). Failure → `401 Unauthorized` |
+| **Role-gated** | Mutating endpoints (POST, PATCH, DELETE) on queue, decisions, live context | User must hold `moderator` or `admin` role. Failure → `403 Forbidden` |
+| **Objectivity-constrained** | Binding decisions (decisions endpoint) | Moderator must NOT be a team member (coder) on the target problem. Checked via `getEffectiveRole()` (see Ch.3). Failure → `403 Forbidden: objectivity constraint` |
+
+### 18.14.2 Endpoint Authorization Matrix
+
+| Endpoint Pattern | GET | POST | PATCH | DELETE |
+|------------------|-----|------|-------|--------|
+| `/api/events/[eventId]/queue` | Authenticated | Moderator | Moderator | — |
+| `/api/events/[eventId]/queue/[problemId]` | — | — | — | Moderator |
+| `/api/events/[eventId]/decisions` | — | Moderator + Objectivity | — | — |
+| `/api/events/[eventId]/live-context` | Authenticated | — | — | — |
+| `/api/assess/[assessmentId]/responses` | Authenticated | Authenticated | — | — |
+
+### 18.14.3 HTTP Error Response Contract
+
+All API error responses follow a consistent shape:
+
+```json
+{ "success": false, "error": "<reason>" }
+```
+
+| HTTP Status | Meaning | When |
+|-------------|---------|------|
+| `400 Bad Request` | Malformed or invalid payload | Missing required fields, invalid values |
+| `401 Unauthorized` | No valid user identity | Missing or invalid session cookie |
+| `403 Forbidden` | Identity known but insufficient privileges | Wrong role, or objectivity constraint violated |
+| `500 Internal Server Error` | Server-side failure | Database errors, unexpected exceptions |
+
+### 18.14.4 Objectivity Constraint at API Level
+
+Before recording a **binding** decision (`is_binding = true`), the decisions endpoint MUST:
+
+1. Authenticate the user (→ 401 if missing)
+2. Verify `moderator` or `admin` role (→ 403 if insufficient)
+3. Call `getEffectiveRole(userId, problemId, eventId)` from the teams repository
+4. If effective role is `coder` (team member on the target problem), reject with `403 Forbidden: objectivity constraint — moderator is a team member on this problem`
+
+This enforces the principle from Ch.12.5: moderators who are coding on a problem lose binding decision authority for that specific problem. They may still make non-binding recommendations (agents and conflicted moderators use `is_binding = false`).

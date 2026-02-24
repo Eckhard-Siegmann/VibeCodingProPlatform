@@ -2,7 +2,7 @@
 
 This chapter specifies the **consolidated persistence model** of the system. It reflects all conceptual decisions from the specification and is designed to support transparency, longitudinal analysis, agentic participation, and pragmatic **multi-location community operations** while remaining structurally elegant and extensible.
 
-The database is assumed to be PostgreSQL, with SQLite supported for development (per Chapter 25 interview findings).
+The database is a relational SQL database. Engine selection is an architectural decision documented in `adr/001_database_engine_strategy.md`.
 
 **Note**: This chapter was significantly expanded to support the community platform model with mandatory authentication, events with partners and venues, team chat, and team formation (see Chapters 18, 29, 30, 31).
 
@@ -17,13 +17,13 @@ The database is assumed to be PostgreSQL, with SQLite supported for development 
 - **Decisions as single source of truth**: All state changes flow through the decisions table.
 - **Minimal coupling**: UI state, workflow state, and analytical state are not conflated.
 - **Future-proofing**: New inventories, agents, and assessment types require no schema migration.
-- **Reference tables over enums**: Controlled vocabularies use VARCHAR + FK reference tables for extensibility without migration overhead (per Chapter 25).
+- **Reference tables over enums**: Controlled vocabularies use VARCHAR + FK reference tables for extensibility without migration overhead (see ADR 001).
 
 ---
 
 ## 19.2 Catalog Tables (Controlled Vocabularies)
 
-Per Chapter 25 interview findings, controlled vocabularies are implemented as **reference tables with VARCHAR primary keys** rather than PostgreSQL enums. This enables adding new values without schema migration.
+Controlled vocabularies are implemented as **reference tables with VARCHAR primary keys** rather than database-engine-specific enum types (see ADR 001). This enables adding new values without schema migration.
 
 ### 19.2.1 `readiness_state_catalog`
 
@@ -121,10 +121,12 @@ Defines all **decision types** that can be recorded in the system.
 | `closed_partial` | Closed: Partial | close | FALSE | TRUE |
 | `opened_for_pitch_assessment` | Opened for Pitch | live | FALSE | FALSE |
 | `closed_for_pitch_assessment` | Closed for Pitch | live | FALSE | FALSE |
-| `opened_for_review_assessment` | Opened for Review | live | FALSE | FALSE |
-| `closed_for_review_assessment` | Closed for Review | live | FALSE | FALSE |
+| `opened_for_review` | Opened for Review | live | FALSE | FALSE |
+| `closed_for_review` | Closed for Review | live | FALSE | FALSE |
 
 Note: There are no separate "recommendation" decision types. Bindingness is orthogonal to decision type (see Ch.10.2). An agent recommending acceptance uses `decision_type = 'quality_gate_accepted'` with `is_binding = false`.
+
+**Implementation Requirement**: The frontend MUST maintain a centralized constants module mirroring the 25 `decision_type_catalog` entries exactly. All UI components and data access functions MUST reference these constants — no inline string literals for decision types. The constants module serves as the code-level single source of truth; the database catalog remains the authoritative source. When catalog entries change, both the SQL seed and the constants module must be updated together. See ADR 002 for the specific file convention.
 
 ---
 
@@ -166,8 +168,8 @@ Maps each decision type to its resulting state changes. This table enables deter
 | `closed_partial` | NULL | closed | NULL |
 | `opened_for_pitch_assessment` | NULL | NULL | pitch |
 | `closed_for_pitch_assessment` | NULL | NULL | idle |
-| `opened_for_review_assessment` | NULL | NULL | review |
-| `closed_for_review_assessment` | NULL | NULL | idle |
+| `opened_for_review` | NULL | NULL | review |
+| `closed_for_review` | NULL | NULL | idle |
 
 ---
 
@@ -834,6 +836,20 @@ Associates problems with events for **backlog management and sprint planning**.
 
 **Constraints**
 - UNIQUE (`event_id`, `problem_id`)
+
+**Ejection Cleanup Invariant**: When a problem transitions to a terminal action state via a decision, its queue entry MUST be handled as follows:
+
+| Decision Category | Queue Effect |
+|-------------------|-------------|
+| `deselected_for_event` | Remove from queue, re-compact `position_index` |
+| `quality_gate_rejected` | Remove from queue, re-compact `position_index` |
+| `dropped_low_relevance` | Remove from queue, re-compact `position_index` |
+| `dropped_low_quality` | Remove from queue, re-compact `position_index` |
+| `closed_complete` | Update `queue_state` to `completed` (remains visible) |
+| `closed_partial` | Update `queue_state` to `completed` (remains visible) |
+| `deferred_*` (all 6 types) | No queue change — deferred problems remain visible but are skipped during the event |
+
+Queue removal is performed within the same transaction as the decision recording (see `recordDecision()` in the events repository). The `removeFromQueueRaw()` function handles deletion and index re-compaction without opening its own transaction, making it safe for use inside the outer decision transaction.
 
 ---
 
@@ -1513,7 +1529,8 @@ This separation ensures that transient operational states (pitch open, review op
 - **Chapter 11**: Event model → `events`, `event_problem_queue`, `event_live_context`
 - **Chapter 13**: Problem Card UI → `problem_resources`, `problem_teams`, `problem_team_members`
 - **Chapter 14**: Live interaction modes → `event_live_context` (including timer fields for pace support)
-- **Chapter 16**: Comments → `comments` table *(DEPRECATED, see Chapter 31)*
+- **Chapter 16**: E-mail communication → trigger inventory, delivery constraints
+- **Chapter 31**: Team chat (replaces deprecated `comments` table)
 - **Chapter 18**: Authentication → `users` (auth fields), `auth_provider_catalog`, `users.show_on_contributor_wall`
 - **Chapter 20**: Traceability → `decisions` as activity log
 - **Chapter 25**: Interview findings → Reference tables pattern, response supersession model

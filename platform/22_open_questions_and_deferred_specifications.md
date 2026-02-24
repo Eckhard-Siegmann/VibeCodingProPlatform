@@ -127,5 +127,39 @@ Whenever possible:
 
 ### Closing Note
 
-This chapter is not a backlog—it is a **design conscience**.  
+This chapter is not a backlog—it is a **design conscience**.
 Its purpose is to ensure that future evolution remains intentional, transparent, and aligned with the system’s core philosophy: enabling rigorous, reflective, and agent-aware collaboration without prematurely freezing the space of possibilities.
+
+---
+
+## 22.4 Recently Resolved Items
+
+### Timer Closure Mechanism *(RESOLVED)*
+
+**Original question**: How do countdown timers "fire" in a stateless web application with no background workers?
+
+**Resolution**: Lazy evaluation on read. Whenever `event_live_context` is read and `timer_ends_at` is in the past, the system auto-closes the current mode via the standard `recordDecision()` path before returning the context. See **Chapter 14, §14.5.1.1** for full specification.
+
+### API Error Response Patterns *(RESOLVED)*
+
+**Original question**: What HTTP status codes and response shapes should API endpoints use for authorization failures?
+
+**Resolution**: Consistent `401 Unauthorized` / `403 Forbidden` contract with `{ success: false, error: "<reason>" }` response shape. The objectivity constraint (moderator coding on a problem cannot make binding decisions for it) is enforced at the API level. See **Chapter 18, §18.14** for full specification.
+
+### Queue Cleanup on Problem Ejection *(RESOLVED)*
+
+**Original question**: When a problem is dropped or rejected, should its queue entry be automatically removed?
+
+**Resolution**: Ejection decisions (`deselected_for_event`, `quality_gate_rejected`, `dropped_low_relevance`, `dropped_low_quality`) remove from queue and re-compact indices. Closing decisions transition queue state to `completed`. Deferral decisions leave queue entries untouched. See **Chapter 19, §19.3.20** for the ejection cleanup invariant.
+
+### Decision Type Vocabulary Consistency *(RESOLVED)*
+
+**Original question**: How to prevent drift between the database `decision_type_catalog` and frontend UI code?
+
+**Resolution**: A centralized TypeScript constants module (`src/lib/constants/decisions.ts`) mirrors all 25 catalog entries. All UI components and repository functions import from this module — no inline string literals. See **Chapter 19, §19.2.3** implementation requirement note.
+
+### Review Decision Type Naming *(RESOLVED)*
+
+**Original question**: Inconsistency between spec (`opened_for_review_assessment`) and seed SQL (`opened_for_review`).
+
+**Resolution**: The shorter form `opened_for_review` / `closed_for_review` is canonical, matching the seed SQL and all code. The spec catalog table in §19.2.3 and §19.2.4 has been corrected accordingly. The pitch types retain the `_assessment` suffix (`opened_for_pitch_assessment` / `closed_for_pitch_assessment`) as originally specified.

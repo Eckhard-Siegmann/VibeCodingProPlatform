@@ -168,6 +168,33 @@ Duration: [5 minutes ▼]  ☐ No time limit
 [Open Pitch]
 ```
 
+#### 14.5.1.1 Timer Auto-Closure Architecture
+
+Since the platform runs as a **stateless web application** without background workers or cron jobs, timer expiry is evaluated **lazily on read**. There is no daemon that fires when a timer reaches zero.
+
+**Lazy evaluation rule**: Whenever `event_live_context` is read (via GET endpoint or server load function), if ALL of the following are true:
+
+1. `timer_ends_at` is non-null
+2. `timer_ends_at` is in the past (compared to server-side `now()`)
+3. `current_mode` is not `idle`
+
+Then the system MUST, before returning the context:
+
+1. Determine the correct close decision type from `current_mode`:
+   - `pitch` → `closed_for_pitch_assessment`
+   - `review` → `closed_for_review`
+2. Record a decision via the standard `recordDecision()` path with:
+   - `actor_user_id`: the event's host user (from `events.host_user_id`)
+   - `rationale`: `"Timer expired (auto-closed)"`
+   - All normal decision side-effects apply (live context → idle, assessment closed, queue state updated)
+3. Return the **updated** (now idle) context to the caller
+
+**Guarantees**:
+- The timer always "fires" on the next read, even if no client polled during the expiry window
+- Client-side countdown display is purely cosmetic — server-side lazy evaluation is **authoritative**
+- Multiple concurrent reads that observe an expired timer are safe: the first to enter the transaction performs the close; subsequent reads see the already-idle context
+- If the server is unreachable during expiry, the timer fires on the first request after the server resumes
+
 ### 14.5.2 Phase Transition Notifications
 
 When phases change, notify participants clearly.

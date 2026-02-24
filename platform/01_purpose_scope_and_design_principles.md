@@ -28,7 +28,7 @@ It assumes:
 - moderate scale (dozens per event, hundreds across the community),
 - and a strong preference for transparency over complex authorization hierarchies.
 
-The system **requires** authentication for all participation (email+password or OAuth via GitHub/LinkedIn) to enable persistent identity, attribution, and cross-location continuity. However, it **does not** implement enterprise-grade authentication features such as SAML SSO, multi-factor authentication, or advanced identity federation.
+The system **requires** authentication for all participation (email+password or OAuth) to enable persistent identity, attribution, and cross-location continuity. However, it **does not** implement enterprise-grade authentication features such as SAML SSO, multi-factor authentication, or advanced identity federation.
 
 The system is **not** optimized for anonymous mass surveys or competitive scoring platforms. These are intentionally out of scope.
 
@@ -61,12 +61,19 @@ The system assumes cooperative users but still records enough metadata to:
 
 Security mechanisms are lightweight, but accountability is strong.
 
-### Human-Centered First, Agent-Ready by Design  
-All workflows must be understandable and operable by humans without agents.  
+### Human-Centered First, Agent-Ready by Design
+All workflows must be understandable and operable by humans without agents.
 At the same time, every artifact is structured so that agents can later:
 - generate assessments,
 - prepare recommendations,
 - and support moderation—without becoming binding decision-makers.
+
+### Stateless Platform, External Triggers
+The platform is a **stateless web application**. It has no background workers, daemons, or cron jobs of its own. All state transitions occur either:
+- **synchronously** in response to user requests (HTTP request → decision → state change → response), or
+- **lazily on read** when the platform detects a condition that should have triggered a transition (e.g., expired timers are evaluated when context is next read — see Chapter 14, §14.5.1.1).
+
+Time-based operations that cannot be handled lazily (e.g., sending reminder emails 24 hours before an event) are initiated by **external infrastructure** (cron jobs, scheduled tasks, or orchestration services) that call into the platform's API. The platform exposes endpoints to handle these triggers but never initiates them autonomously. The design and configuration of external schedulers is an architectural concern documented outside this specification (see `adr/`).
 
 ## 1.4 Scope of the System
 
@@ -78,7 +85,7 @@ The system **does include**:
 - explicit decision logging,
 - event planning and orchestration,
 - longitudinal analysis across versions and events,
-- authentication and identity management (email/password, OAuth),
+- authentication and identity management (email/password, OAuth; see ADR 004),
 - contribution recognition (points for quality content, stars for excellence),
 - team chat and real-time collaboration,
 - transactional email notifications (registration, waitlist, onboarding).
@@ -98,10 +105,16 @@ These exclusions are intentional to preserve conceptual clarity and maintainabil
 This chapter defines the invariant constraints for the entire specification.
 
 - **Chapter 2 (Conceptual Overview)** elaborates the domain model implied here.
+- **Chapter 3** defines roles, actors, and the authority model.
 - **Chapters 4–6** operationalize the notion of Problems and Versions.
 - **Chapters 7–9** implement the evaluation philosophy defined above.
 - **Chapter 10** formalizes decisions as the sole state-changing mechanism.
 - **Chapters 11–15** translate these principles into event-time workflows and UI behavior.
+- **Chapter 16** defines outbound e-mail triggers and delivery constraints.
+- **Chapter 17** specifies administration interfaces.
+- **Chapters 18, 29–33** cover authentication, community platform, and recognition.
+- **Chapters 19–20** define the data model, persistence, and system logs.
+- **Chapters 21–22** outline extensibility, future directions, and open questions.
 
 Any future extension must be evaluated against the principles defined in this chapter before inclusion.
 

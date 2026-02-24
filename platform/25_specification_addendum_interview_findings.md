@@ -112,24 +112,6 @@ A: Future scope. Agents will mine PR descriptions later. Manual inspection for f
 
 ---
 
-## Tech Stack Decision
-
-> **SUPERSEDED**: This section documents the initial tech stack decision made during the 2026-01-28 interview. The tech stack was subsequently updated to **SvelteKit 2.x + Tailwind CSS 4.x**. See **Chapter 26 (UI Specification Addendum), Section 26.8** for the current authoritative tech stack decision and rationale.
-
-~~**Decision: Next.js 14 (App Router) + shadcn/ui + Drizzle ORM**~~
-
-**Current Decision: SvelteKit 2.x + Tailwind CSS 4.x** (per Chapter 26)
-
-**Original Rationale (historical):**
-- shadcn/ui has excellent responsive form components (RadioGroup, Slider) for survey rendering
-- Drizzle ORM works with both SQLite (MVP) and PostgreSQL (production) with same code
-- 2-day timeline requires component assembly, not custom building
-- Static export possible for traditional hosting on Andreas's webserver
-
-**Critical UI requirement (still valid):** Survey elements must render ergonomically and beautifully on arbitrary devices. Test all scale sizes (1,2,3,5,7,10, plus any new sizes) for responsive behavior.
-
----
-
 ## Schema Refinements Required
 
 ### 25.1 Replace Enums with Reference Tables

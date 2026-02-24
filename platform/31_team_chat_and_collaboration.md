@@ -1,6 +1,6 @@
 # 31. Team Chat and Collaboration
 
-This chapter specifies the **team chat system** that replaces the previous comment system (Chapter 16). Chat provides real-time collaboration, team formation, and persistent discussion around problems.
+This chapter specifies the **team chat system** that replaces the previous comment system (formerly Chapter 16, now repurposed for e-mail communication). Chat provides real-time collaboration, team formation, and persistent discussion around problems.
 
 ---
 
@@ -18,7 +18,7 @@ The team chat system provides:
 
 ### Replaces Comments
 
-The previous `comments` table (Chapter 16) is **deprecated**. All qualitative feedback and discussion now flows through the chat system, which provides:
+The previous `comments` table is **deprecated**. All qualitative feedback and discussion now flows through the chat system, which provides:
 
 - Richer context (problem, event, team, situation)
 - Real-time updates
@@ -867,7 +867,7 @@ Currently not implemented due to limited scale (2x/month, ~50 messages/problem):
 
 - **Chapter 4**: Problem Cards display chat
 - **Chapter 13**: Problem Card UI with chat section
-- **Chapter 16**: DEPRECATED comments system
+- **Chapter 16**: E-mail communication (chapter repurposed; deprecated `comments` table retained in schema for historical data only)
 - **Chapter 18**: Authentication required for chat
 - **Chapter 19**: Data model for chat tables
 - **Chapter 29**: Events context for messages

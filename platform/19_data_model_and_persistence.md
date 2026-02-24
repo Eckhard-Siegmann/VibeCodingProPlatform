@@ -555,8 +555,8 @@ Caches the **current live orchestration state** for an event. This is a derived/
 |----------|------------|
 | `opened_for_pitch_assessment` | `current_mode = 'pitch'`, `current_problem_id = X` |
 | `closed_for_pitch_assessment` | `current_mode = 'idle'`, `current_problem_id = NULL` |
-| `opened_for_review_assessment` | `current_mode = 'review'`, `current_problem_id = X` |
-| `closed_for_review_assessment` | `current_mode = 'idle'`, `current_problem_id = NULL` |
+| `opened_for_review` | `current_mode = 'review'`, `current_problem_id = X` |
+| `closed_for_review` | `current_mode = 'idle'`, `current_problem_id = NULL` |
 
 **Invariants**
 - This table is a **cache**, not a source of truth
@@ -806,7 +806,7 @@ Stores **qualitative feedback** separately from decisions.
 | `comment_id` | UUID | PK | |
 | `problem_id` | UUID | FK → problems, NOT NULL | |
 | `problem_version_id` | UUID | FK → problem_versions, nullable | If tied to specific version |
-| `session_id` | UUID | FK → sessions, NOT NULL | |
+| `session_id` | UUID | *(historical — references removed `sessions` table)* | Pre-authentication legacy column |
 | `user_id` | UUID | FK → users, nullable | If authenticated |
 | `actor_role` | VARCHAR(20) | NOT NULL, FK → user_role_catalog | |
 | `comment_text` | TEXT | NOT NULL | |
@@ -816,6 +816,7 @@ Stores **qualitative feedback** separately from decisions.
 - Comments are append-only, never edited or deleted
 - Non-binding by default; do not change system state
 - **New comments should use `chat_messages` instead**
+- The `session_id` column is a historical artifact from the pre-authentication model; the `sessions` table has been removed (§19.3.2)
 
 ---
 
@@ -1082,7 +1083,7 @@ Tracks **emoji reactions** on chat messages.
 
 ---
 
-### 19.3.27 `lessons_learned`
+### 19.3.28 `lessons_learned`
 
 Captures **structured insights** from working on problems. Unlike chat messages (chronological flow), lessons learned are curated, categorized knowledge artifacts.
 
@@ -1122,7 +1123,7 @@ Captures **structured insights** from working on problems. Unlike chat messages 
 
 ---
 
-### 19.3.28 `lesson_category_catalog`
+### 19.3.29 `lesson_category_catalog`
 
 Reference table for predefined lesson categories.
 
@@ -1138,7 +1139,7 @@ Reference table for predefined lesson categories.
 
 ---
 
-### 19.3.29 `problem_type_catalog`
+### 19.3.30 `problem_type_catalog`
 
 Reference table for problem classification types.
 
@@ -1164,7 +1165,7 @@ Reference table for problem classification types.
 
 ---
 
-### 19.3.30 `team_member_role_catalog`
+### 19.3.31 `team_member_role_catalog`
 
 Reference table for team member roles.
 
@@ -1187,7 +1188,7 @@ Reference table for team member roles.
 
 ---
 
-### 19.3.31 `team_member_status_catalog`
+### 19.3.32 `team_member_status_catalog`
 
 Reference table for team membership status.
 
@@ -1209,7 +1210,7 @@ Reference table for team membership status.
 
 ---
 
-### 19.3.32 `contribution_action_catalog`
+### 19.3.33 `contribution_action_catalog`
 
 Reference table for **point-earning actions** in the contributor recognition system. Weights are admin-configurable.
 
@@ -1244,7 +1245,7 @@ Reference table for **point-earning actions** in the contributor recognition sys
 
 ---
 
-### 19.3.33 `contribution_points`
+### 19.3.34 `contribution_points`
 
 **Append-only ledger** of points awarded to users. Each row represents one point-earning event.
 
@@ -1279,7 +1280,7 @@ Reference table for **point-earning actions** in the contributor recognition sys
 
 ---
 
-### 19.3.34 `star_awards`
+### 19.3.35 `star_awards`
 
 Tracks **hacking excellence awards** (1st, 2nd, 3rd place) for best solutions per problem per event.
 
@@ -1315,7 +1316,7 @@ Tracks **hacking excellence awards** (1st, 2nd, 3rd place) for best solutions pe
 
 ---
 
-### 19.3.35 `review_weight_catalog`
+### 19.3.36 `review_weight_catalog`
 
 Reference table for **review weightings** used in star award calculations. Different review contexts have different authority.
 
@@ -1343,7 +1344,7 @@ Reference table for **review weightings** used in star award calculations. Diffe
 
 ---
 
-### 19.3.36 `contributor_wall_6week` (View)
+### 19.3.37 `contributor_wall_6week` (View)
 
 **Aggregation view** for the public contributor wall. Shows top-10 contributors over a rolling 6-week window.
 
@@ -1377,7 +1378,7 @@ LIMIT 10;
 
 ---
 
-### 19.3.37 `user_milestones`
+### 19.3.38 `user_milestones`
 
 Tracks **first-time achievements** for milestone recognition (Chapter 33). Used to trigger celebration moments and avoid repeated notifications.
 
@@ -1418,7 +1419,7 @@ VALUES (?, ?, 'first_problem_submitted', NOW(), ?, 'problem');
 
 ---
 
-### 19.3.38 `user_hint_dismissals`
+### 19.3.39 `user_hint_dismissals`
 
 Tracks **dismissed onboarding hints** so users don't see the same guidance repeatedly (Chapter 32).
 

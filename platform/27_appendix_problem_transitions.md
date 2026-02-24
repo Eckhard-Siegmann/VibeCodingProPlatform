@@ -59,7 +59,7 @@ All state transitions are driven by decisions. The `decision_type_catalog` (Ch.1
 | **Deferral** | `deferred_po_absent`, `deferred_low_priority`, `deferred_skipped`, `deferred_too_complex`, `deferred_needs_refinement`, `deferred_future_capability` | No | Yes |
 | **Drop** | `dropped_low_relevance`, `dropped_low_quality` | No | Yes |
 | **Close** | `closed_complete`, `closed_partial` | No | Yes |
-| **Live** | `opened_for_pitch_assessment`, `closed_for_pitch_assessment`, `opened_for_review_assessment`, `closed_for_review_assessment` | No | No |
+| **Live** | `opened_for_pitch_assessment`, `closed_for_pitch_assessment`, `opened_for_review`, `closed_for_review` | No | No |
 
 ### Key Invariants
 
@@ -207,7 +207,7 @@ If a problem was selected for coding but participants lose interest:
 
 ### Opening a Review Assessment
 
-**Decision**: `opened_for_review_assessment` (binding, moderator)
+**Decision**: `opened_for_review` (binding, moderator)
 
 **Effect on `event_live_context`**:
 - `current_mode` = `review`
@@ -217,7 +217,7 @@ If a problem was selected for coding but participants lose interest:
 
 ### Closing a Review Assessment
 
-**Decision**: `closed_for_review_assessment` (binding, moderator)
+**Decision**: `closed_for_review` (binding, moderator)
 
 **Effect on `event_live_context`**:
 - `current_mode` = `idle`

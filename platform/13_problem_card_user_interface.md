@@ -291,7 +291,7 @@ Moderators can trigger **single-click decisions**, including but not limited to:
 - `selected_for_event` / `deselected_for_event`
 - `selected_for_coding` / `deselected_for_coding`
 - `opened_for_pitch_assessment` / `closed_for_pitch_assessment`
-- `opened_for_review_assessment` / `closed_for_review_assessment`
+- `opened_for_review` / `closed_for_review`
 - Quality gate decisions: `quality_gate_accepted`, `quality_gate_rejected`, `quality_gate_needs_changes`
 - Deferral decisions: `deferred_po_absent`, `deferred_low_priority`, `deferred_skipped`, `deferred_too_complex`, `deferred_needs_refinement`, `deferred_future_capability`
 - Drop decisions: `dropped_low_relevance`, `dropped_low_quality`

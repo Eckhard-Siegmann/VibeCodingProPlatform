@@ -80,6 +80,12 @@ All sections collapsible except Live Banner and Current Activity (always visible
 **Critical**: Most important moderator tool
 **Mobile Pattern**: Accordion by category (Ch.26.12.3)
 
+**Component reuse mandate**: The `DecisionAccordion` is a **single reusable component**. It is used in:
+1. **Moderator Dashboard** — sidebar panel, receives `problemId` from queue selection
+2. **Problem Card** — `ModeratorControlPanel` wrapper, receives `problemId` from route params
+
+Both contexts use identical accordion markup, category definitions, and decision availability logic. The component receives `currentReadinessState` and `currentActionState` as props and derives button availability from the Decision Availability Rules below.
+
 **Full Specification**:
 
 ### Category 1: Quality Gate (Blue)
@@ -278,6 +284,36 @@ function toggleCategory(category: DecisionCategory) {
 - Expanded: Chevron ▲, header slightly darker
 - Collapsed: Chevron ▼, header normal
 - Transition: Chevron rotation, content height
+
+### Decision Availability Rules
+
+Not all decisions are available in all states. The `DecisionAccordion` component derives button availability from the problem's current `readiness_state` and `action_state`:
+
+| Decision Type | Available When |
+|---|---|
+| `quality_gate_accepted` | readiness = `submitted` OR `needs_changes` |
+| `quality_gate_needs_changes` | readiness = `submitted` OR `needs_changes` |
+| `quality_gate_rejected` | readiness = `submitted` OR `needs_changes` |
+| `selected_for_event` | readiness = `ready` AND action = `backlog` |
+| `deselected_for_event` | action = `selected_for_event` |
+| `selected_for_coding` | action = `selected_for_event` |
+| `deselected_for_coding` | action = `selected_for_coding` |
+| `opened_for_pitch_assessment` | action = `selected_for_event` OR `selected_for_coding` |
+| `closed_for_pitch_assessment` | action = `selected_for_event` OR `selected_for_coding` |
+| `opened_for_review` | action = `selected_for_event` OR `selected_for_coding` |
+| `closed_for_review` | action = `selected_for_event` OR `selected_for_coding` |
+| `deferred_*` (all 6) | action NOT IN (`closed`, `dropped`) |
+| `dropped_*` (both) | action NOT IN (`closed`, `dropped`) |
+| `closed_*` (both) | action NOT IN (`closed`, `dropped`) |
+
+**Lifecycle decisions** (`problem_created`, `problem_cloned`, `problem_submitted`, `problem_updated`) are never shown in the accordion — they are system-recorded, not moderator-initiated.
+
+**Visual treatment of unavailable decisions**:
+- Buttons shown with `opacity-50` and `cursor-not-allowed`
+- Category header badge shows available/total count (e.g., "2/3")
+- Entire category visually muted if 0 decisions available
+
+**Source**: Ch.10 (decision model), Ch.05 (dual-state transitions), Ch.27 (transition diagram)
 
 ---
 

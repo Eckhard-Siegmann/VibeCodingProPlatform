@@ -111,8 +111,8 @@ Live orchestration is tracked in `event_live_context`, **not** as action states.
 |----------|--------------------------------|-------------------------|
 | `opened_for_pitch_assessment` | `current_mode = 'pitch'`, `current_problem_id = X` | **None** |
 | `closed_for_pitch_assessment` | `current_mode = 'idle'`, `current_problem_id = NULL` | **None** |
-| `opened_for_review_assessment` | `current_mode = 'review'`, `current_problem_id = X` | **None** |
-| `closed_for_review_assessment` | `current_mode = 'idle'`, `current_problem_id = NULL` | **None** |
+| `opened_for_review` | `current_mode = 'review'`, `current_problem_id = X` | **None** |
+| `closed_for_review` | `current_mode = 'idle'`, `current_problem_id = NULL` | **None** |
 
 This separation ensures that transient orchestration state does not pollute the Problem's durable state model.
 
@@ -140,8 +140,8 @@ Per `decision_state_effects` table (Ch.19.2.4):
 | `closed_*` (2 types) | — | closed | — |
 | `opened_for_pitch_assessment` | — | — | pitch |
 | `closed_for_pitch_assessment` | — | — | idle |
-| `opened_for_review_assessment` | — | — | review |
-| `closed_for_review_assessment` | — | — | idle |
+| `opened_for_review` | — | — | review |
+| `closed_for_review` | — | — | idle |
 
 (— indicates no change to that dimension)
 

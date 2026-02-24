@@ -135,6 +135,7 @@ At a high level, the chapters are organized as follows:
 - **Chapters 06–09** describe repositories/resources, inventories, items, assessments, and data capture.
 - **Chapters 10–11** define decisions, state transitions, and the event model.
 - **Chapters 12–15** specify dashboards, problem card UI, live interaction modes, and results/analytics.
+- **Chapter 16** defines e-mail communication policies and delivery triggers.
 - **Chapter 17** covers administration interfaces.
 - **Chapter 18** specifies authentication and access control (mandatory for all users).
 - **Chapters 19–20** address the data model, persistence, and system logs/traceability.

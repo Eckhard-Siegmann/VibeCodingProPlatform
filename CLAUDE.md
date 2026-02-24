@@ -415,7 +415,7 @@ export async function hashData(data: string): Promise<string> {
 
 ### Team Chat Replaces Comments
 
-**Decision**: The `comments` table is **deprecated** (Ch.16, Ch.19.3.19). All new qualitative feedback flows through the `chat_messages` system (Ch.31).
+**Decision**: The `comments` table is **deprecated** (Ch.31, Ch.19.3.19). All new qualitative feedback flows through the `chat_messages` system (Ch.31).
 
 **Rationale**:
 - Chat provides richer context (problem, event, team, situation)

@@ -50,7 +50,7 @@ Live interaction modes do **not** introduce new domain objects. They orchestrate
 ### Activation
 - Review Mode is opened explicitly by a Moderator.
 - It may occur immediately after hacking, during open hacking, or asynchronously after the event.
-- Opening Review Mode creates a **binding Decision** (`opened_for_review_assessment`).
+- Opening Review Mode creates a **binding Decision** (`opened_for_review`).
 
 ### Participant Experience
 - Participants access the Review via:
@@ -73,7 +73,7 @@ Live interaction modes do **not** introduce new domain objects. They orchestrate
 
 ### Deactivation
 - Review Mode is closed explicitly or automatically (see 14.3).
-- Closure creates a **binding Decision** (`closed_for_review_assessment`).
+- Closure creates a **binding Decision** (`closed_for_review`).
 - After closure, responses become read-only.
 
 ---
@@ -298,7 +298,7 @@ The following table maps event phases to the moderator actions and decision type
 | **Pitch phase** (per problem) | `opened_for_pitch_assessment`, `closed_for_pitch_assessment` | Pitch countdown (default 5 min), extend | Push "Vote now" notification |
 | **Selection discussion** (after all pitches) | `selected_for_coding`, `deselected_for_coding`, `deferred_*` | — | View pitch results, reorder queue |
 | **Coding sprint** | `deselected_for_coding` (if team fails to form) | Sprint countdown, extend | **Team formation** ("Join as Dev"), monitor team chat, send announcement |
-| **Review phase** (per problem) | `opened_for_review_assessment`, `closed_for_review_assessment` | Optional review countdown | Push "Review now" notification |
+| **Review phase** (per problem) | `opened_for_review`, `closed_for_review` | Optional review countdown | Push "Review now" notification |
 | **Post-event wrap-up** | `closed_complete`, `closed_partial`, `dropped_*` | — | Award stars (Ch.33.6.4), capture lessons learned, mark attendance |
 
 **Note**: Moderators are free to execute any available decision at any time. For example, a moderator may defer a problem during the pitch phase if the Problem Owner is unexpectedly absent (`deferred_po_absent`), or re-open a review during wrap-up if new information surfaces. The table above reflects the *typical* alignment, not a constraint.

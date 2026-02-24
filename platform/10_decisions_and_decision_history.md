@@ -58,7 +58,7 @@ A decision type may:
 - Update both,
 - Or update neither (live orchestration decisions like opening/closing pitch or review).
 
-**Important distinction**: Live orchestration modes (`pitch`, `review`, `idle`) are **not** action states. They are transient operational contexts tracked separately in the `event_live_context` table. Decisions like `opened_for_pitch_assessment` and `closed_for_review_assessment` affect the live context, not the problem's cached action state.
+**Important distinction**: Live orchestration modes (`pitch`, `review`, `idle`) are **not** action states. They are transient operational contexts tracked separately in the `event_live_context` table. Decisions like `opened_for_pitch_assessment` and `closed_for_review` affect the live context, not the problem's cached action state.
 
 State transitions are deterministic and derived exclusively from the decision log. There is no direct mutation of Problem state outside this mechanism.
 
@@ -92,7 +92,7 @@ The system defines 25 decision types across 8 categories:
 - `closed_complete`, `closed_partial`
 
 **Live (4)**: Assessment window orchestration
-- `opened_for_pitch_assessment`, `closed_for_pitch_assessment`, `opened_for_review_assessment`, `closed_for_review_assessment`
+- `opened_for_pitch_assessment`, `closed_for_pitch_assessment`, `opened_for_review`, `closed_for_review`
 
 See Chapter 19 for the complete `decision_type_catalog` with state effect mappings.
 

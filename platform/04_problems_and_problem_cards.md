@@ -280,7 +280,7 @@ Together, immutable Problem identity, the Problem Card as a versioned working ar
 
 ---
 
-## 4.3 Mobile Interface Patterns
+## 4.4 Mobile Interface Patterns
 
 **Added 2026-02-05**: Mobile-specific display patterns for Problem Card.
 

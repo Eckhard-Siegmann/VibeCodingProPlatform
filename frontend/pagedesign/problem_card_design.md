@@ -560,49 +560,15 @@ PageContainer (three-layer depth)
          └─ [Submit] | [Modify] [Clone]
 ```
 
-### Moderator Decision Buttons (NOT YET IMPLEMENTED)
+### Moderator Decision Buttons
 
-**Color-Coded Single-Click Decisions**:
+Decision buttons use the **`DecisionAccordion` component** specified in `moderator_dashboard_design.md` §Decision Accordion. The same 7-category accordion, color scheme, comment requirements, and state-dependent availability rules apply (see §Decision Availability Rules in that document).
 
-**Quality Gate** (Blue):
-- [Accept] — `bg-primary text-white`
-- [Request Changes] — `bg-warning text-white`
-- [Reject] — `bg-alert text-white`
+**Wrapper**: `ModeratorControlPanel` — wraps `DecisionAccordion` in a `Card` with `CardHeader` title "Moderator Decisions". Receives `problemId`, `currentReadinessState`, `currentActionState` from the page server load. Visible only when `flags.canMakeDecisions = true`.
 
-**Event Planning** (Green):
-- [Select for Event] — `bg-success text-white`
-- [Deselect from Event] — `bg-secondary text-headers`
+**Difference from Dashboard**: No problem selector needed (problem is implicit from the route). The accordion receives the problem identity directly from the page context rather than from a queue selection.
 
-**Sprint Planning** (Purple):
-- [Select for Coding] — `bg-purple text-white`
-- [Deselect from Coding] — `bg-secondary text-headers`
-
-**Deferral** (Yellow, multiple variants):
-- [Defer: PO Absent] — `bg-pending text-white`
-- [Defer: Low Priority] — `bg-pending text-white`
-- [Defer: Too Complex] — `bg-pending text-white`
-- [Defer: Skipped] — `bg-pending text-white`
-- [Defer: Needs Refinement] — `bg-pending text-white`
-- [Defer: Future Capability] — `bg-pending text-white`
-
-**Drop** (Red):
-- [Drop: Low Relevance] — `bg-alert text-white`
-- [Drop: Low Quality] — `bg-alert text-white`
-
-**Close** (Purple):
-- [Close: Complete] — `bg-purple text-white`
-- [Close: Partial] — `bg-purple/80 text-white`
-
-**Interaction**:
-1. Moderator clicks decision button
-2. Optional: Comment modal appears (for Request Changes, Reject, Defer, Drop)
-3. POST `/api/decisions` with decision_type, problem_id, rationale
-4. Decision logged immediately
-5. Problem state updated
-6. All views refresh to show new state
-7. Next steps guidance updates
-
-**Source**: Ch.12.5, Ch.17.8.3, Ch.10
+**Source**: Ch.10, Ch.12.5; see `moderator_dashboard_design.md` for full accordion specification
 
 ### Moderator Chat Controls
 
@@ -1233,7 +1199,7 @@ This pattern:
 | **ChatMessage** | N | Per message (needed) |
 | **ChatSystemMessage** | N | Per system event (needed) |
 | **ResourceList** | 2 | Direct + helpful (partial) |
-| **ModeratorControlPanel** | 1 | Decision buttons (needed) |
+| **ModeratorControlPanel** | 1 | Card wrapper around DecisionAccordion (see moderator_dashboard_design.md) |
 
 ---
 

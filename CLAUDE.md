@@ -29,21 +29,24 @@ This is a **specification documentation project** for a professional, agentic, r
 ### Workflow
 
 ```
-1. Discuss feature requirements
-2. Identify open questions
-3. Resolve questions with stakeholder
-4. Document ALL decisions in platform/*.md
-5. Update schema spec in Chapter 19
-6. ONLY THEN proceed to implementation
+Phase 1 — SPECIFICATION          platform/*.md
+Phase 2 — ARCHITECTURAL DECISION adr/*.md
+Phase 3 — DESIGN DECISION        frontend/template/ + frontend/pagedesign/
+Phase 4 — IMPLEMENTATION         frontend/query/src/, database/schema.sql
 ```
+
+Implementation is allowed ONLY when Phases 1-3 leave little room for guesswork.
 
 ### Where to Document
 
 | Content Type | Location |
 |-------------|----------|
 | Feature specification | `platform/XX_chapter_name.md` |
+| Architectural decisions | `adr/NNN_decision_name.md` |
 | Schema changes | `platform/19_data_model_and_persistence.md` |
 | UI specifications | `platform/13_problem_card_user_interface.md` or `platform/26_specification_addendum_UI.md` |
+| Design system & templates | `frontend/template/` |
+| Page compositions | `frontend/pagedesign/` |
 | Future ideas (not MVP) | Section "Future Directions" in relevant chapter |
 | Open questions | `platform/22_open_questions_and_deferred_specifications.md` |
 
@@ -61,8 +64,8 @@ The technical specification is organized as numbered markdown files in the `plat
 | **03-05** | Roles/authority model, problems, problem cards, versioning |
 | **06-09** | Repositories, inventories, items, assessments, voting |
 | **10-11** | Decisions, state transitions, event model |
-| **12-18** | UI specifications (dashboards, problem cards, live interaction, team chat, admin, auth) |
-| **19-22** | Data model (PostgreSQL), system logs, extensibility, open questions |
+| **12-18** | UI specifications (dashboards, problem cards, live interaction, admin), e-mail communication (Ch.16), auth (Ch.18) |
+| **19-22** | Data model, system logs, extensibility, open questions |
 | **23-24** | Appendix: User stories, item & inventory bootstrap data |
 | **25-26** | Addenda: Interview findings, UI specification addendum |
 | **27-28** | Appendix: Problem transitions, transition diagram |
@@ -83,6 +86,18 @@ The technical specification is organized as numbered markdown files in the `plat
 | `problem_creation_best_practices.md` | **Guide for Problem Owners**: How to create effective Problem Cards, spectrum of readiness, tooling documentation |
 | `Announcement_VibeCoding-Professionals_Meetup.md` | Event announcement with full agenda |
 | `Announcement_VibeCoding-Professionals_Meetup_LinkedIn.md` | LinkedIn-style promotional text |
+
+### Architecture Decision Records (`adr/` directory)
+
+Implementation-specific decisions are documented as ADRs, separate from the behavioral specifications:
+
+| File | Decision |
+|------|----------|
+| `adr/001_database_engine_strategy.md` | Dual-engine (PostgreSQL prod / SQLite dev), UUID keys, VARCHAR+FK pattern |
+| `adr/002_frontend_technology_stack.md` | SvelteKit 2.x, Svelte 5, Tailwind CSS 4.x, folder structure |
+| `adr/003_component_system_architecture.md` | shadcn-svelte pattern, bits-ui primitives, cn() utility, dependencies |
+| `adr/004_authentication_providers.md` | GitHub OAuth, LinkedIn OAuth, password hashing algorithm |
+| `adr/005_email_provider_brevo.md` | Brevo REST API for transactional email delivery |
 
 ### Other
 
@@ -145,8 +160,8 @@ Problems have two orthogonal states:
 
 ### Authentication Methods
 - **Local**: Email + password (10+ chars, uppercase, lowercase, numbers)
-- **GitHub OAuth**: Convenient for developers
-- **LinkedIn OAuth**: Professional networking context
+- **OAuth (developer platform)**: Convenient for developers (see ADR 004)
+- **OAuth (professional platform)**: Professional networking context (see ADR 004)
 
 ### Identity Principles
 - **Email as unique identifier**: Same email = same user across events and locations
@@ -166,7 +181,7 @@ Problems have two orthogonal states:
 
 ## Database
 
-PostgreSQL with append-only event sourcing. SQLite supported for development. Key tables:
+Relational SQL database with append-only event sourcing (see ADR 001 for engine strategy). Key tables:
 
 ### Core Domain Tables
 | Table | Purpose |
@@ -321,63 +336,33 @@ The specification follows a **balanced approach** to cross-chapter duplication:
 
 ## Frontend Design & Development Workflow
 
-### MANDATORY Design-First Sequence
+All frontend work follows the 4-phase pipeline defined under **SPEC-FIRST Development Principle** above. This section describes the design assets and page-level specifications that feed into Phase 3 and Phase 4.
 
-All frontend work follows a strict 4-step process:
+### Design System Assets (`frontend/template/`)
 
-1. **SPECIFICATION FIRST** (`platform/*.md`)
-   - Merge UI design decisions into relevant specification chapters
-   - Resolve any conflicts with existing specs
-   - Document component behavior, states, and interactions
-   - Chapters 12-14, 26: Primary UI specification chapters
+| File | Purpose |
+|------|---------|
+| `frontend style guide.md` | Color tokens, three-layer backgrounds, shadow system, spacing |
+| `likert style guide.md` | Rating scale visual patterns (5-point Likert) |
+| `template_collection.md` | Catalog of 59 reusable component patterns |
+| `template example.png` | Dashboard reference with proper shadows |
+| `5-point-likert-scale.png` | Rating matrix visual reference |
 
-2. **TEMPLATE CREATION/AMENDMENT** (`frontend/templates/`)
-   - Update `template_collection.md` with new patterns
-   - Create reusable Svelte components in `frontend/templates/components/`
-   - Document when and how to use each template
-   - Ensure accessibility compliance (WCAG 2.1 AA)
+### Page Design Documents (`frontend/pagedesign/`)
 
-3. **SITE DESIGN DOCUMENTS** (`frontend/pagedesign/`)
-   - Create detailed page-specific specifications
-   - Document which templates are used and how they compose
-   - Specify role-based visibility and state management
-   - Problem Card has 3 perspectives: PO/Deputy, Observer, Moderator/Admin
+Each UI page requires a design specification before implementation:
 
-4. **IMPLEMENTATION** (`frontend/query/src/`)
-   - Implement using documented templates and patterns
-   - **MANDATORY**: Use `frontend-design` skill for all UI work
-   - Follow established component architecture
-   - Maintain design system consistency
-
-### Page Design Documents
-
-Each UI page requires a design specification in `frontend/pagedesign/`:
-
-| File | Purpose | Status |
-|------|---------|--------|
-| `assessment_form_design.md` | Survey/pitch/review rating interface | **To be created retroactively** |
-| `finished_popup_design.md` | Assessment completion confirmation | **To be created retroactively** |
-| `problem_card_design.md` | Problem Card with 3 perspectives | **To be created** |
-| `dashboard_design.md` | Participant and moderator dashboards | TBD |
-| `event_detail_design.md` | Event information and registration | TBD |
-| `landing_page_design.md` | Public landing page | TBD |
-
-**Problem Card Perspectives** (must be documented in `problem_card_design.md`):
-1. **Problem Owner / Deputy PO**: Edit controls, submission, resource management
-2. **Observer**: View-only, assessment links when open, suggestion capability
-3. **Moderator / Admin**: All decision controls, quality gate, event selection
-
-### Design System Foundation
-
-**Style Guide**: `frontend/template/frontend style guide.md`
-- Three-layer background: viewport (#DCEBFF) → canvas (#F1F2F8) → card (#FEFEFE)
-- Etched 3D separator technique
-- Shadow system: resting (minimal) and floating (elevated)
-- Full color token system in `frontend/query/src/app.css`
-
-**Visual References**:
-- `frontend/template/template example.png` - Dashboard with proper shadows
-- `frontend/template/5-point-likert-scale.png` - Rating matrix pattern
+| File | Purpose |
+|------|---------|
+| `problem_card_design.md` | Problem Card (PO, Observer, Moderator perspectives) |
+| `assessment_form_design.md` | Survey/pitch/review rating interface |
+| `finished_popup_design.md` | Assessment completion confirmation |
+| `dashboard_design.md` | Participant dashboard |
+| `moderator_dashboard_design.md` | Moderator dashboard |
+| `landing_page_design.md` | Public landing page |
+| `event_detail_design.md` | Event information and registration |
+| `admin_interfaces_design.md` | Admin management interfaces |
+| `results_analytics_design.md` | Results and analytics views |
 
 ### Skill Usage
 
@@ -386,7 +371,6 @@ Each UI page requires a design specification in `frontend/pagedesign/`:
 - Modifying existing component designs
 - Implementing page layouts
 - Styling and visual refinement
-- Ensuring design system consistency
 
 Do NOT implement frontend code without first using the `frontend-design` skill.
 
@@ -499,10 +483,12 @@ frontend/
 │   │       ├── assess/[assessmentId]/ # Assessment form
 │   │       └── api/            # API endpoints
 │   └── package.json
-├── template/                   # Design system documentation
-│   └── frontend style guide.md
-├── templates/                  # Reusable patterns
-│   └── template_collection.md
+├── template/                   # Design system & component patterns
+│   ├── frontend style guide.md
+│   ├── likert style guide.md
+│   ├── template_collection.md
+│   ├── template example.png
+│   └── 5-point-likert-scale.png
 └── pagedesign/                 # Page-specific designs
     └── *.md
 database/

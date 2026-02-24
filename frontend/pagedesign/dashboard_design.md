@@ -198,7 +198,7 @@ Two dashboard views sharing common elements but with role-specific additions. Pa
 ┌─────────────────────────────────────┐
 │ Recent Activity              [▼]    │
 │                                     │
-│ 2m ago  Eva commented               │
+│ 2m ago  Eva posted in chat           │
 │         "Great progress on tests"   │
 │         → API Rate Limiter          │
 │                                     │
@@ -665,7 +665,7 @@ interface Props {
 - [ ] My Problems list shows user's created problems
 - [ ] Decision accordion expands/collapses correctly
 - [ ] Only one category open at a time (accordion)
-- [ ] Decision buttons work (all 25 types)
+- [ ] Decision buttons work (all 26 types)
 - [ ] Comment modal appears when required
 - [ ] Selected problems list shows current event problems
 - [ ] Timer controls extend/close phase

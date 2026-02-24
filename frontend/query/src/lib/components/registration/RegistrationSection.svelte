@@ -46,11 +46,14 @@
 	}: Props = $props();
 
 	// Form state
-	let attendanceMode = $state<'in_presence' | 'remote'>(
-		userRegistration?.attendanceMode ?? 'in_presence'
-	);
+	let attendanceMode = $state<'in_presence' | 'remote'>('in_presence');
 	let termsAccepted = $state(false);
 	let newsletter = $state(true); // Default checked per spec
+
+	// Sync attendance mode from registration prop
+	$effect(() => {
+		attendanceMode = userRegistration?.attendanceMode ?? 'in_presence';
+	});
 
 	// Computed states
 	const isRegistered = $derived(!!userRegistration && !userRegistration.waitlistStatus);

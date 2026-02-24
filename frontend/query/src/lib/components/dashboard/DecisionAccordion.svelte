@@ -55,9 +55,9 @@
 			headerColor: 'bg-primary/10 text-primary',
 			icon: CheckCircle,
 			buttons: [
-				{ key: 'accepted', label: 'Accept' },
-				{ key: 'changes_requested', label: 'Request Changes', variant: 'secondary' },
-				{ key: 'rejected', label: 'Reject', variant: 'destructive' }
+				{ key: 'quality_gate_accepted', label: 'Accept' },
+				{ key: 'quality_gate_needs_changes', label: 'Request Changes', variant: 'secondary' },
+				{ key: 'quality_gate_rejected', label: 'Reject', variant: 'destructive' }
 			]
 		},
 		{
@@ -120,10 +120,10 @@
 			headerColor: 'bg-warning-bg text-warning',
 			icon: Zap,
 			buttons: [
-				{ key: 'open_pitch', label: 'Open Pitch' },
-				{ key: 'close_pitch', label: 'Close Pitch', variant: 'secondary' },
-				{ key: 'open_review', label: 'Open Review' },
-				{ key: 'close_review', label: 'Close Review', variant: 'secondary' }
+				{ key: 'opened_for_pitch_assessment', label: 'Open Pitch' },
+				{ key: 'closed_for_pitch_assessment', label: 'Close Pitch', variant: 'secondary' },
+				{ key: 'opened_for_review', label: 'Open Review' },
+				{ key: 'closed_for_review', label: 'Close Review', variant: 'secondary' }
 			]
 		}
 	];

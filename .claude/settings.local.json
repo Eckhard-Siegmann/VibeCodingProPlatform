@@ -42,7 +42,8 @@
       "Bash(npx svelte-check:*)",
       "Bash(\"D:/dev/prj/meetup/database/.sqlite-tools/sqlite3.exe\" \"D:/dev/prj/meetup/database/event.db\" \"ALTER TABLE users ADD COLUMN audio_cues_enabled INTEGER NOT NULL DEFAULT 0 CHECK(audio_cues_enabled IN (0,1));\")",
       "Bash(wc -l \"D:\\dev\\prj\\meetup\\frontend\\query\\src\\lib\\server\\repositories\"/*.ts)",
-      "Bash(tee:*)"
+      "Bash(tee:*)",
+      "Bash(cd:*)"
     ]
   }
 }

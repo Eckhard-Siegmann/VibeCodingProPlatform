@@ -51,7 +51,7 @@ Key future-facing integration paths:
   Agents may generate non-binding decision recommendations, risk assessments, or prioritization hints. Binding authority always remains with human roles or explicitly defined group decisions.
 
 - **Training data generation as a side effect**  
-  All agent outputs—assessments, recommendations, comments—become structured data. Over time, this enables meta-agents that learn from prior events, evaluations, and decisions.
+  All agent outputs—assessments, recommendations, chat messages—become structured data. Over time, this enables meta-agents that learn from prior events, evaluations, and decisions.
 
 The architecture deliberately avoids embedding assumptions about *how* agents reason. It only constrains *how their outputs are recorded and contextualized*.
 

@@ -57,7 +57,9 @@ During drafting, the Problem Card UI displays a link to the **Best Practices Gui
 
 ### Archival Behavior
 
-Problems can be archived or rendered inactive for future events. Archiving:
+Problems can be archived by the Problem Owner via a binding `problem_archived` decision (Ch.10.3). This decision sets the `archived_at` timestamp on the `problems` table (Ch.19.3.10) and is recorded in the decision log like any other state change.
+
+Archiving does **not** change readiness or action state. It is an orthogonal flag:
 
 - Removes the Problem from default listings and dashboards.
 - Does **not** invalidate existing URLs.
@@ -81,7 +83,7 @@ A Problem Card typically contains:
 - **Direct Resources**: Repositories and resources directly relevant to the problem
 - **Helpful Artifacts**: Repositories and resources with useful reference material
 - Structural metadata (problem type, task count) — see "Informative Metadata" below
-- Version metadata and change comments
+- Version metadata and change notes
 - Team chat display (see Chapter 31)
 - "Challenge accepted" button for team formation
 

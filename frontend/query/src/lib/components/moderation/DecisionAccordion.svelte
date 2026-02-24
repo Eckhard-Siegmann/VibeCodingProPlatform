@@ -2,6 +2,7 @@
 	import { cn } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
 	import { AccordionSection } from '$lib/components/ui/accordion-section';
+	import { DECISION_TYPES, type DecisionTypeKey } from '$lib/constants/decisions';
 	import Shield from '@lucide/svelte/icons/shield';
 	import Calendar from '@lucide/svelte/icons/calendar';
 	import Code from '@lucide/svelte/icons/code';
@@ -11,7 +12,7 @@
 	import Play from '@lucide/svelte/icons/play';
 
 	export interface DecisionType {
-		decision_type: string;
+		decision_type: DecisionTypeKey;
 		label: string;
 		description?: string;
 		requiresComment?: boolean;
@@ -56,15 +57,15 @@
 			label: 'Quality Gate',
 			color: 'blue',
 			decisions: [
-				{ decision_type: 'accepted', label: 'Accept', description: 'Problem meets criteria' },
+				{ decision_type: 'quality_gate_accepted', label: 'Accept', description: 'Problem meets criteria' },
 				{
-					decision_type: 'needs_changes',
+					decision_type: 'quality_gate_needs_changes',
 					label: 'Request Changes',
 					description: 'Needs refinement',
 					requiresComment: true
 				},
 				{
-					decision_type: 'rejected',
+					decision_type: 'quality_gate_rejected',
 					label: 'Reject',
 					description: 'Does not meet criteria',
 					requiresComment: true
@@ -77,7 +78,7 @@
 			color: 'green',
 			decisions: [
 				{ decision_type: 'selected_for_event', label: 'Select for Event', description: 'Add to event agenda' },
-				{ decision_type: 'deselected_from_event', label: 'Deselect from Event', description: 'Remove from event' }
+				{ decision_type: 'deselected_for_event', label: 'Deselect from Event', description: 'Remove from event' }
 			]
 		},
 		{
@@ -86,7 +87,7 @@
 			color: 'purple',
 			decisions: [
 				{ decision_type: 'selected_for_coding', label: 'Select for Coding', description: 'Start sprint' },
-				{ decision_type: 'deselected_from_coding', label: 'Deselect from Coding', description: 'Cancel sprint' }
+				{ decision_type: 'deselected_for_coding', label: 'Deselect from Coding', description: 'Cancel sprint' }
 			]
 		},
 		{
@@ -125,10 +126,10 @@
 			label: 'Live Assessments',
 			color: 'orange',
 			decisions: [
-				{ decision_type: 'pitch_opened', label: 'Open Pitch', description: 'Start pitch voting' },
-				{ decision_type: 'pitch_closed', label: 'Close Pitch', description: 'End pitch voting' },
-				{ decision_type: 'review_opened', label: 'Open Review', description: 'Start review voting' },
-				{ decision_type: 'review_closed', label: 'Close Review', description: 'End review voting' }
+				{ decision_type: 'opened_for_pitch_assessment', label: 'Open Pitch', description: 'Start pitch voting' },
+				{ decision_type: 'closed_for_pitch_assessment', label: 'Close Pitch', description: 'End pitch voting' },
+				{ decision_type: 'opened_for_review', label: 'Open Review', description: 'Start review voting' },
+				{ decision_type: 'closed_for_review', label: 'Close Review', description: 'End review voting' }
 			]
 		}
 	];
@@ -180,24 +181,23 @@
 
 	// Check if a decision is available based on current state
 	function isDecisionAvailable(decision: DecisionType): boolean {
-		// This is a simplified check - in production, use the decision_state_effects table
 		switch (decision.decision_type) {
-			case 'accepted':
-			case 'needs_changes':
-			case 'rejected':
+			case 'quality_gate_accepted':
+			case 'quality_gate_needs_changes':
+			case 'quality_gate_rejected':
 				return currentReadinessState === 'submitted' || currentReadinessState === 'needs_changes';
 			case 'selected_for_event':
 				return currentReadinessState === 'ready' && currentActionState === 'backlog';
-			case 'deselected_from_event':
+			case 'deselected_for_event':
 				return currentActionState === 'selected_for_event';
 			case 'selected_for_coding':
 				return currentActionState === 'selected_for_event';
-			case 'deselected_from_coding':
+			case 'deselected_for_coding':
 				return currentActionState === 'selected_for_coding';
-			case 'pitch_opened':
-			case 'pitch_closed':
-			case 'review_opened':
-			case 'review_closed':
+			case 'opened_for_pitch_assessment':
+			case 'closed_for_pitch_assessment':
+			case 'opened_for_review':
+			case 'closed_for_review':
 				return currentActionState === 'selected_for_event' || currentActionState === 'selected_for_coding';
 			default:
 				// Deferral, drop, close decisions

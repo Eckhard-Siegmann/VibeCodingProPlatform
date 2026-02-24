@@ -33,23 +33,23 @@
 	let { data }: Props = $props();
 
 	// Default demo data
-	const stats = data?.stats ?? {
+	let stats = $derived(data?.stats ?? {
 		users: 156,
 		events: 12,
 		problems: 45,
 		assessments: 234,
 		decisions: 567
-	};
+	});
 
-	const health = data?.health ?? {
+	let health = $derived(data?.health ?? {
 		activeEvents: 2,
 		openAssessments: 3,
 		retiredItems: 5,
 		pendingRegistrations: 18
-	};
+	});
 
 	// Admin sections with navigation
-	const sections = [
+	let sections = $derived([
 		{
 			title: 'User Management',
 			description: 'View, import, and manage user accounts',
@@ -82,7 +82,7 @@
 			stat: null,
 			statLabel: null
 		}
-	];
+	]);
 </script>
 
 <svelte:head>

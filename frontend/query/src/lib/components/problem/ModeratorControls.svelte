@@ -14,6 +14,7 @@
 	 */
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils';
+	import { DECISION_TYPES, type DecisionTypeKey } from '$lib/constants/decisions';
 	import { Card, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { AccordionSection } from '$lib/components/ui/accordion-section';
 	import { Button } from '$lib/components/ui/button';
@@ -26,7 +27,7 @@
 	import Play from '@lucide/svelte/icons/play';
 
 	export interface DecisionType {
-		decisionType: string;
+		decisionType: DecisionTypeKey;
 		label: string;
 		description?: string;
 		requiresComment?: boolean;
@@ -72,15 +73,15 @@
 			color: 'blue',
 			icon: Shield,
 			decisions: [
-				{ decisionType: 'accepted', label: 'Accept', description: 'Problem meets criteria' },
+				{ decisionType: 'quality_gate_accepted', label: 'Accept', description: 'Problem meets criteria' },
 				{
-					decisionType: 'needs_changes',
+					decisionType: 'quality_gate_needs_changes',
 					label: 'Request Changes',
 					description: 'Needs refinement',
 					requiresComment: true
 				},
 				{
-					decisionType: 'rejected',
+					decisionType: 'quality_gate_rejected',
 					label: 'Reject',
 					description: 'Does not meet criteria',
 					requiresComment: true
@@ -94,7 +95,7 @@
 			icon: Calendar,
 			decisions: [
 				{ decisionType: 'selected_for_event', label: 'Select for Event', description: 'Add to agenda' },
-				{ decisionType: 'deselected_from_event', label: 'Deselect from Event', description: 'Remove from event' }
+				{ decisionType: 'deselected_for_event', label: 'Deselect from Event', description: 'Remove from event' }
 			]
 		},
 		{
@@ -104,7 +105,7 @@
 			icon: Code,
 			decisions: [
 				{ decisionType: 'selected_for_coding', label: 'Select for Coding', description: 'Start sprint' },
-				{ decisionType: 'deselected_from_coding', label: 'Deselect from Coding', description: 'Cancel sprint' }
+				{ decisionType: 'deselected_for_coding', label: 'Deselect from Coding', description: 'Cancel sprint' }
 			]
 		},
 		{
@@ -147,10 +148,10 @@
 			color: 'orange',
 			icon: Play,
 			decisions: [
-				{ decisionType: 'pitch_opened', label: 'Open Pitch' },
-				{ decisionType: 'pitch_closed', label: 'Close Pitch' },
-				{ decisionType: 'review_opened', label: 'Open Review' },
-				{ decisionType: 'review_closed', label: 'Close Review' }
+				{ decisionType: 'opened_for_pitch_assessment', label: 'Open Pitch' },
+				{ decisionType: 'closed_for_pitch_assessment', label: 'Close Pitch' },
+				{ decisionType: 'opened_for_review', label: 'Open Review' },
+				{ decisionType: 'closed_for_review', label: 'Close Review' }
 			]
 		}
 	];
@@ -168,22 +169,22 @@
 	// Check if a decision is available based on current state
 	function isDecisionAvailable(decision: DecisionType): boolean {
 		switch (decision.decisionType) {
-			case 'accepted':
-			case 'needs_changes':
-			case 'rejected':
+			case 'quality_gate_accepted':
+			case 'quality_gate_needs_changes':
+			case 'quality_gate_rejected':
 				return currentReadinessState === 'submitted' || currentReadinessState === 'needs_changes';
 			case 'selected_for_event':
 				return currentReadinessState === 'ready' && currentActionState === 'backlog';
-			case 'deselected_from_event':
+			case 'deselected_for_event':
 				return currentActionState === 'selected_for_event';
 			case 'selected_for_coding':
 				return currentActionState === 'selected_for_event';
-			case 'deselected_from_coding':
+			case 'deselected_for_coding':
 				return currentActionState === 'selected_for_coding';
-			case 'pitch_opened':
-			case 'pitch_closed':
-			case 'review_opened':
-			case 'review_closed':
+			case 'opened_for_pitch_assessment':
+			case 'closed_for_pitch_assessment':
+			case 'opened_for_review':
+			case 'closed_for_review':
 				return currentActionState === 'selected_for_event' || currentActionState === 'selected_for_coding';
 			default:
 				return currentActionState !== 'closed' && currentActionState !== 'dropped';

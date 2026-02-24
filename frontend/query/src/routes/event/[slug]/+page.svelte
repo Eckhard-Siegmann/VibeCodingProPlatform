@@ -68,13 +68,13 @@ This month we'll explore AI-assisted development with real coding challenges fro
 	});
 
 	// Event data for registration section
-	const registrationEvent: EventData = {
+	let registrationEvent: EventData = $derived({
 		id: eventData.id,
 		title: eventData.title,
 		capacity: 30,
 		registeredCount: 18,
 		waitlistCount: 0
-	};
+	});
 
 	// Demo user registration state - null means not registered
 	let userRegistration = $state<UserRegistration | null>(null);

@@ -104,7 +104,7 @@
 		{
 			id: 'act-3',
 			type: 'chat_message',
-			title: 'commented on your problem',
+			title: 'posted in your problem chat',
 			description: 'Great idea! Have you considered using a hybrid approach?',
 			actor: { id: 'user-3', displayName: 'Lisa Chen' },
 			problemTitle: 'Code Review Automation',

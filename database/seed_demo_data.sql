@@ -11,12 +11,23 @@ PRAGMA foreign_keys = ON;
 -- 1. DEMO USERS
 --------------------------------------------------------------------------------
 
-INSERT INTO users (user_id, email, display_name, password_hash, auth_provider, role, is_admin, email_confirmed, login_enabled, get_infoletter, terms_accepted_at, show_on_contributor_wall, show_first_time_hints, created_at) VALUES
-  ('demo-user-001', 'max.mustermann@startplatz.de', 'Max Mustermann', NULL, 'local', 'developer', 0, 1, 1, 1, '2026-01-15T10:00:00Z', 1, 1, '2026-01-15T10:00:00Z'),
-  ('demo-user-002', 'eva.schmidt@example.com', 'Eva Schmidt', NULL, 'local', 'moderator', 0, 1, 1, 1, '2026-01-10T09:00:00Z', 1, 1, '2026-01-10T09:00:00Z'),
-  ('demo-user-003', 'tom.weber@example.com', 'Tom Weber', NULL, 'local', 'developer', 0, 1, 1, 1, '2026-01-20T14:00:00Z', 1, 1, '2026-01-20T14:00:00Z'),
-  ('demo-user-004', 'lisa.chen@example.com', 'Lisa Chen', NULL, 'local', 'developer', 0, 1, 1, 1, '2026-01-22T11:00:00Z', 1, 1, '2026-01-22T11:00:00Z'),
-  ('demo-admin-001', 'admin@vibecoding.dev', 'Admin User', NULL, 'local', 'admin', 1, 1, 1, 1, '2026-01-01T00:00:00Z', 0, 0, '2026-01-01T00:00:00Z');
+-- Human users (api_key_id = NULL for all humans)
+INSERT INTO users (user_id, email, display_name, password_hash, auth_provider, role, is_admin, email_confirmed, login_enabled, get_infoletter, terms_accepted_at, show_on_contributor_wall, show_first_time_hints, api_key_id, created_at) VALUES
+  ('demo-user-001', 'max.mustermann@startplatz.de', 'Max Mustermann', NULL, 'local', 'developer', 0, 1, 1, 1, '2026-01-15T10:00:00Z', 1, 1, NULL, '2026-01-15T10:00:00Z'),
+  ('demo-user-002', 'eva.schmidt@example.com', 'Eva Schmidt', NULL, 'local', 'moderator', 0, 1, 1, 1, '2026-01-10T09:00:00Z', 1, 1, NULL, '2026-01-10T09:00:00Z'),
+  ('demo-user-003', 'tom.weber@example.com', 'Tom Weber', NULL, 'local', 'developer', 0, 1, 1, 1, '2026-01-20T14:00:00Z', 1, 1, NULL, '2026-01-20T14:00:00Z'),
+  ('demo-user-004', 'lisa.chen@example.com', 'Lisa Chen', NULL, 'local', 'developer', 0, 1, 1, 1, '2026-01-22T11:00:00Z', 1, 1, NULL, '2026-01-22T11:00:00Z'),
+  ('demo-admin-001', 'admin@vibecoding.dev', 'Admin User', NULL, 'local', 'admin', 1, 1, 1, 1, '2026-01-01T00:00:00Z', 0, 0, NULL, '2026-01-01T00:00:00Z');
+
+-- Demo API key owned by Admin User
+INSERT INTO api_keys (api_key_id, owner_user_id, key_hash, display_prefix, label, valid_from, valid_until, revoked_at, created_at) VALUES
+  ('demo-apikey-001', 'demo-admin-001',
+   'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3',  -- SHA-256 of '123' (demo only)
+   'demo1234', 'Demo Review Bot', '2026-01-01T00:00:00Z', NULL, NULL, '2026-01-01T00:00:00Z');
+
+-- Bot user linked to the demo API key (display_name = "Bot of {owner.display_name}")
+INSERT INTO users (user_id, email, display_name, password_hash, auth_provider, role, is_admin, email_confirmed, login_enabled, get_infoletter, terms_accepted_at, show_on_contributor_wall, show_first_time_hints, api_key_id, created_at) VALUES
+  ('demo-bot-001', NULL, 'Bot of Admin User', NULL, 'local', 'agent', 0, 0, 0, 0, NULL, 0, 0, 'demo-apikey-001', '2026-01-01T00:00:00Z');
 
 --------------------------------------------------------------------------------
 -- 2. PARTNER, LOCATION, ROOM, EVENT (for assessment context)

@@ -14,7 +14,7 @@ The platform requires a relational SQL database for its append-only event-source
 - Development environment must be lightweight and file-copyable for backup
 - Production environment must handle concurrent multi-user access during live events
 
-The platform specification (Chapters 1-22) is intentionally **engine-agnostic** — it describes SQL schemas without depending on vendor-specific features.
+The platform specification (Chapters 00-33) is intentionally **engine-agnostic** — it describes SQL schemas without depending on vendor-specific features.
 
 ## Decision
 

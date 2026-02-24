@@ -94,7 +94,7 @@ Defines all **decision types** that can be recorded in the system.
 | `is_active` | BOOLEAN | NOT NULL, default TRUE | Whether currently in use |
 | `created_at` | TIMESTAMP | NOT NULL | |
 
-**Catalog Data (25 decision types)**
+**Catalog Data (26 decision types)**
 
 | type_key | display_name | category | affects_readiness | affects_action |
 |----------|--------------|----------|-------------------|----------------|
@@ -102,6 +102,7 @@ Defines all **decision types** that can be recorded in the system.
 | `problem_cloned` | Problem Cloned | lifecycle | TRUE | TRUE |
 | `problem_submitted` | Problem Submitted | lifecycle | TRUE | FALSE |
 | `problem_updated` | Problem Updated | lifecycle | TRUE | FALSE |
+| `problem_archived` | Problem Archived | lifecycle | FALSE | FALSE |
 | `quality_gate_accepted` | Quality Gate Accepted | quality_gate | TRUE | FALSE |
 | `quality_gate_rejected` | Quality Gate Rejected | quality_gate | TRUE | FALSE |
 | `quality_gate_needs_changes` | Quality Gate Needs Changes | quality_gate | TRUE | FALSE |
@@ -126,7 +127,7 @@ Defines all **decision types** that can be recorded in the system.
 
 Note: There are no separate "recommendation" decision types. Bindingness is orthogonal to decision type (see Ch.10.2). An agent recommending acceptance uses `decision_type = 'quality_gate_accepted'` with `is_binding = false`.
 
-**Implementation Requirement**: The frontend MUST maintain a centralized constants module mirroring the 25 `decision_type_catalog` entries exactly. All UI components and data access functions MUST reference these constants — no inline string literals for decision types. The constants module serves as the code-level single source of truth; the database catalog remains the authoritative source. When catalog entries change, both the SQL seed and the constants module must be updated together. See ADR 002 for the specific file convention.
+**Implementation Requirement**: The frontend MUST maintain a centralized constants module mirroring the 26 `decision_type_catalog` entries exactly. All UI components and data access functions MUST reference these constants — no inline string literals for decision types. The constants module serves as the code-level single source of truth; the database catalog remains the authoritative source. When catalog entries change, both the SQL seed and the constants module must be updated together. See ADR 002 for the specific file convention.
 
 ---
 
@@ -149,6 +150,7 @@ Maps each decision type to its resulting state changes. This table enables deter
 | `problem_cloned` | draft | backlog | NULL |
 | `problem_submitted` | submitted | NULL | NULL |
 | `problem_updated` | draft | NULL | NULL |
+| `problem_archived` | NULL | NULL | NULL |
 | `quality_gate_accepted` | ready | NULL | NULL |
 | `quality_gate_rejected` | rejected | NULL | NULL |
 | `quality_gate_needs_changes` | needs_changes | NULL | NULL |
@@ -283,13 +285,16 @@ Defines the situational context for chat messages.
 | `is_active` | BOOLEAN | NOT NULL, default TRUE | |
 | `created_at` | TIMESTAMP | NOT NULL | |
 
-**Catalog Data (4 contexts)**
+**Catalog Data (5 contexts)**
 | context_key | display_name | sort_order |
 |-------------|--------------|------------|
 | `pre_discussion` | Pre-Discussion | 1 |
 | `pitch_discussion` | Pitch Discussion | 2 |
 | `while_building` | While Building | 3 |
 | `while_reviewing` | While Reviewing | 4 |
+| `event_announcement` | Event Announcement | 5 |
+
+The first four contexts are **problem-centric** (used when `problem_id` is set). The `event_announcement` context is used for **event-wide messages** where `problem_id IS NULL` — moderator announcements, system phase echoes, and community sharing (see Chapter 31.16).
 
 ---
 
@@ -348,8 +353,7 @@ Unified table for **all actors**: human participants, moderators, administrators
 | `show_first_time_hints` | BOOLEAN | NOT NULL, default TRUE | Show contextual onboarding hints (Chapter 32) |
 | `audio_cues_enabled` | BOOLEAN | NOT NULL, default FALSE | User preference for countdown timer audio alerts (Ch.14.5.1) |
 | `default_dashboard_view` | VARCHAR(50) | nullable, default 'upcoming_events' | Default dashboard section on login (Chapter 32) |
-| `api_token_hash` | VARCHAR | nullable | For agent authentication (hashed token) |
-| `api_token_expires_at` | TIMESTAMP | nullable | Agent token expiration |
+| `api_key_id` | UUID | FK → api_keys, nullable | Links bot users to their API key (NULL for humans) |
 | `created_at` | TIMESTAMP | NOT NULL | |
 | `last_login_at` | TIMESTAMP | nullable | |
 
@@ -360,11 +364,13 @@ Unified table for **all actors**: human participants, moderators, administrators
 - At least 1 number
 
 **Invariants**
-- Agents always have `role = 'agent'` and `is_admin = false`
+- Agents always have `role = 'agent'`, `is_admin = false`, and `api_key_id` NOT NULL
+- Agent `display_name` follows the convention `Bot of {owner.display_name}` where owner is the human user who created the API key
 - OAuth users have `password_hash = NULL` and appropriate `github_id` or `linkedin_id`
 - Local auth users must have `password_hash` set (after OTP change)
 - Same email reuses existing user record (lookup before insert)
 - `terms_accepted_at` must be set before user can participate in events
+- Multiple bot users may reference the same `api_key_id` (shared API key across bots)
 
 **Audio Preferences**:
 - Audio cues for countdown timers (warning at 1min, expiry at 0:00)
@@ -596,7 +602,7 @@ Represents the **identity of a problem across all versions**. Contains immutable
 **Invariants**
 - Slugs are generated once and never change
 - Cached states are updated transactionally with binding decisions
-- Archival hides problem from default listings but preserves all data
+- Archival is triggered by a binding `problem_archived` decision, which sets `archived_at` to the decision timestamp. Hides problem from default listings but preserves all data
 
 ---
 
@@ -794,33 +800,7 @@ Canonical **event log** for all decisions, recommendations, and state transition
 
 ---
 
-### 19.3.19 `comments` *(DEPRECATED)*
-
-> **DEPRECATED**: This table is retained for historical data only. New qualitative feedback is captured via the **team chat system** (see `chat_messages` table and Chapter 31). The chat system provides richer context, threading, and real-time collaboration.
-
-Stores **qualitative feedback** separately from decisions.
-
-**Columns**
-| Column | Type | Constraints | Notes |
-|--------|------|-------------|-------|
-| `comment_id` | UUID | PK | |
-| `problem_id` | UUID | FK → problems, NOT NULL | |
-| `problem_version_id` | UUID | FK → problem_versions, nullable | If tied to specific version |
-| `session_id` | UUID | *(historical — references removed `sessions` table)* | Pre-authentication legacy column |
-| `user_id` | UUID | FK → users, nullable | If authenticated |
-| `actor_role` | VARCHAR(20) | NOT NULL, FK → user_role_catalog | |
-| `comment_text` | TEXT | NOT NULL | |
-| `created_at` | TIMESTAMP | NOT NULL | |
-
-**Invariants**
-- Comments are append-only, never edited or deleted
-- Non-binding by default; do not change system state
-- **New comments should use `chat_messages` instead**
-- The `session_id` column is a historical artifact from the pre-authentication model; the `sessions` table has been removed (§19.3.2)
-
----
-
-### 19.3.20 `event_problem_queue`
+### 19.3.19 `event_problem_queue`
 
 Associates problems with events for **backlog management and sprint planning**.
 
@@ -854,7 +834,7 @@ Queue removal is performed within the same transaction as the decision recording
 
 ---
 
-### 19.3.21 `problem_teams`
+### 19.3.20 `problem_teams`
 
 Represents a **team formed around a problem** at a specific event. Created when participants click "Challenge accepted" on a Problem Card.
 
@@ -876,7 +856,7 @@ Represents a **team formed around a problem** at a specific event. Created when 
 
 ---
 
-### 19.3.22 `problem_team_members`
+### 19.3.21 `problem_team_members`
 
 Tracks **membership** in problem teams with **version-scoped onboarding**.
 
@@ -928,7 +908,7 @@ Tracks **membership** in problem teams with **version-scoped onboarding**.
 
 ---
 
-### 19.3.23 `problem_resources`
+### 19.3.22 `problem_resources`
 
 Tracks **URLs and resources** associated with problems. Supports two lists: directly relevant resources and helpful artifacts.
 
@@ -952,9 +932,9 @@ Tracks **URLs and resources** associated with problems. Supports two lists: dire
 
 ---
 
-### 19.3.24 `chat_messages`
+### 19.3.23 `chat_messages`
 
-Stores **atomic chat messages** with rich contextual metadata. Replaces the deprecated `comments` table (see Chapter 31).
+Stores **atomic chat messages** with rich contextual metadata.
 
 **Columns**
 | Column | Type | Constraints | Notes |
@@ -963,11 +943,11 @@ Stores **atomic chat messages** with rich contextual metadata. Replaces the depr
 | `user_id` | UUID | FK → users, NOT NULL | |
 | `problem_id` | UUID | FK → problems, nullable | NULL for event-wide chat |
 | `problem_version_id` | UUID | FK → problem_versions, nullable | Version context for display |
-| `major_version` | INTEGER | NOT NULL | **Direct version for efficient filtering** |
+| `major_version` | INTEGER | nullable | NULL for event-wide messages (no problem context); set for problem-scoped messages |
 | `minor_version` | INTEGER | nullable | Nullable per Ch.25 (GitHub may be unavailable) |
 | `event_id` | UUID | FK → events, nullable | NULL for cross-event discussion |
 | `team_id` | UUID | FK → problem_teams, nullable | NULL if not team-specific |
-| `context_situation` | VARCHAR(20) | FK → chat_context_catalog, NOT NULL | pre_discussion, pitch_discussion, while_building, while_reviewing |
+| `context_situation` | VARCHAR(20) | FK → chat_context_catalog, NOT NULL | Problem-scoped: pre_discussion, pitch_discussion, while_building, while_reviewing; Event-wide: event_announcement |
 | `content` | TEXT | NOT NULL | Message content (**max 2000 chars, enforced at app layer**) |
 | `reply_to_message_id` | UUID | FK → chat_messages, nullable | For threading |
 | `url_disclosed` | BOOLEAN | NOT NULL, default FALSE | Message contains URL (auto-detected) |
@@ -980,9 +960,10 @@ Stores **atomic chat messages** with rich contextual metadata. Replaces the depr
 | `edited_at` | TIMESTAMP | nullable | NULL if never edited |
 
 **Version Tracking Rationale**
-- `major_version` stored directly for efficient filtering without JOIN
+- `major_version` stored directly for efficient filtering without JOIN (problem-scoped messages)
+- `major_version` is NULL for event-wide messages (`problem_id IS NULL`) — these have no problem context
 - `minor_version` nullable because GitHub snapshot may not be available (per Ch.25)
-- Default chat view filters to current major version only
+- Default problem chat view filters to current major version only
 - Cross-version chat history accessible via filter change
 
 **Content Limits**
@@ -1007,16 +988,28 @@ Stores **atomic chat messages** with rich contextual metadata. Replaces the depr
 - `idx_chat_by_problem`: `(problem_id, created_at)` - For problem-scoped queries
 - `idx_chat_by_version`: `(problem_id, major_version, created_at)` - **For version-filtered queries**
 - `idx_chat_by_team`: `(team_id, created_at)` - For team chat queries
+- `idx_chat_by_event`: `(event_id, created_at) WHERE problem_id IS NULL` - **For event-wide chat queries**
 - `idx_visible_chat`: `(problem_id, created_at) WHERE visible = TRUE`
 
 **Notes**
 - Chat is a **filterable view** over atomic messages
 - Filters: by problem, by event, by team, by role, by version, contains_URL, moderator posts, PO posts
 - Polling: 3s during active event, 10s otherwise
+- **Location community timeline**: Aggregates event-wide messages across all events at the same location. No dedicated table — derived via query:
+  ```sql
+  WHERE problem_id IS NULL
+    AND event_id IN (
+      SELECT e.event_id FROM events e
+      JOIN rooms r ON e.room_id = r.room_id
+      WHERE r.location_id = :location_id
+    )
+  ORDER BY created_at DESC
+  ```
+  See Chapter 31.16.4 for the behavioral specification.
 
 ---
 
-### 19.3.25 `chat_mentions`
+### 19.3.24 `chat_mentions`
 
 Tracks **@mentions** in chat messages for notifications.
 
@@ -1032,7 +1025,7 @@ Tracks **@mentions** in chat messages for notifications.
 
 ---
 
-### 19.3.26 `chat_reactions`
+### 19.3.25 `chat_reactions`
 
 Tracks **emoji reactions** on chat messages.
 
@@ -1050,7 +1043,7 @@ Tracks **emoji reactions** on chat messages.
 
 ---
 
-### 19.3.27 `emoji_catalog`
+### 19.3.26 `emoji_catalog`
 
 **Curated set of 10 emojis** for reactions (see Chapter 31.4 for rationale).
 
@@ -1083,7 +1076,7 @@ Tracks **emoji reactions** on chat messages.
 
 ---
 
-### 19.3.28 `lessons_learned`
+### 19.3.27 `lessons_learned`
 
 Captures **structured insights** from working on problems. Unlike chat messages (chronological flow), lessons learned are curated, categorized knowledge artifacts.
 
@@ -1123,7 +1116,7 @@ Captures **structured insights** from working on problems. Unlike chat messages 
 
 ---
 
-### 19.3.29 `lesson_category_catalog`
+### 19.3.28 `lesson_category_catalog`
 
 Reference table for predefined lesson categories.
 
@@ -1139,7 +1132,7 @@ Reference table for predefined lesson categories.
 
 ---
 
-### 19.3.30 `problem_type_catalog`
+### 19.3.29 `problem_type_catalog`
 
 Reference table for problem classification types.
 
@@ -1165,7 +1158,7 @@ Reference table for problem classification types.
 
 ---
 
-### 19.3.31 `team_member_role_catalog`
+### 19.3.30 `team_member_role_catalog`
 
 Reference table for team member roles.
 
@@ -1188,7 +1181,7 @@ Reference table for team member roles.
 
 ---
 
-### 19.3.32 `team_member_status_catalog`
+### 19.3.31 `team_member_status_catalog`
 
 Reference table for team membership status.
 
@@ -1210,7 +1203,7 @@ Reference table for team membership status.
 
 ---
 
-### 19.3.33 `contribution_action_catalog`
+### 19.3.32 `contribution_action_catalog`
 
 Reference table for **point-earning actions** in the contributor recognition system. Weights are admin-configurable.
 
@@ -1245,7 +1238,7 @@ Reference table for **point-earning actions** in the contributor recognition sys
 
 ---
 
-### 19.3.34 `contribution_points`
+### 19.3.33 `contribution_points`
 
 **Append-only ledger** of points awarded to users. Each row represents one point-earning event.
 
@@ -1280,7 +1273,7 @@ Reference table for **point-earning actions** in the contributor recognition sys
 
 ---
 
-### 19.3.35 `star_awards`
+### 19.3.34 `star_awards`
 
 Tracks **hacking excellence awards** (1st, 2nd, 3rd place) for best solutions per problem per event.
 
@@ -1316,7 +1309,7 @@ Tracks **hacking excellence awards** (1st, 2nd, 3rd place) for best solutions pe
 
 ---
 
-### 19.3.36 `review_weight_catalog`
+### 19.3.35 `review_weight_catalog`
 
 Reference table for **review weightings** used in star award calculations. Different review contexts have different authority.
 
@@ -1344,7 +1337,7 @@ Reference table for **review weightings** used in star award calculations. Diffe
 
 ---
 
-### 19.3.37 `contributor_wall_6week` (View)
+### 19.3.36 `contributor_wall_6week` (View)
 
 **Aggregation view** for the public contributor wall. Shows top-10 contributors over a rolling 6-week window.
 
@@ -1378,7 +1371,7 @@ LIMIT 10;
 
 ---
 
-### 19.3.38 `user_milestones`
+### 19.3.37 `user_milestones`
 
 Tracks **first-time achievements** for milestone recognition (Chapter 33). Used to trigger celebration moments and avoid repeated notifications.
 
@@ -1419,7 +1412,7 @@ VALUES (?, ?, 'first_problem_submitted', NOW(), ?, 'problem');
 
 ---
 
-### 19.3.39 `user_hint_dismissals`
+### 19.3.38 `user_hint_dismissals`
 
 Tracks **dismissed onboarding hints** so users don't see the same guidance repeatedly (Chapter 32).
 
@@ -1458,6 +1451,82 @@ VALUES (?, 'first_problem_welcome', NOW());
 
 ---
 
+### 19.3.39 `api_keys`
+
+Manages **API keys** that authenticate bot users against the platform's REST API. Keys are created and revoked exclusively by human users; bots cannot create or manage keys.
+
+**Purpose**
+- Authenticate bot (agent) users via Bearer token
+- Enable humans to manage their bots' lifecycle
+- Track key validity with temporal bounds (mirrors `waitlist_expires_at` pattern from §19.3.7)
+- Support revocation without deleting historical attribution
+
+**Columns**
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `api_key_id` | UUID | PK | |
+| `owner_user_id` | UUID | FK → users, NOT NULL | The human who created this key |
+| `key_hash` | VARCHAR | NOT NULL | SHA-256 hash of the API key (plaintext never stored) |
+| `display_prefix` | VARCHAR(8) | NOT NULL | First 8 chars of key for identification in UI |
+| `label` | VARCHAR(100) | nullable | Human-readable label (e.g., "My Claude bot") |
+| `valid_from` | TIMESTAMP | NOT NULL | Key becomes active at this time |
+| `valid_until` | TIMESTAMP | nullable | Key expires at this time; NULL = no expiry |
+| `revoked_at` | TIMESTAMP | nullable | Set when owner revokes; NULL = not revoked |
+| `created_at` | TIMESTAMP | NOT NULL | |
+
+**Invariants**
+- `owner_user_id` must reference a human user (`is_human = TRUE` in `user_role_catalog`)
+- A key is valid when: `valid_from ≤ NOW()` AND (`valid_until IS NULL` OR `valid_until > NOW()`) AND `revoked_at IS NULL`
+- Revocation is permanent and immediate — once `revoked_at` is set, the key cannot be reactivated
+- The plaintext API key is shown exactly once at creation time; only the hash is persisted
+- `display_prefix` enables humans to identify keys without exposing the full secret
+
+**Bot User Creation Flow**
+1. Human creates an API key via Account Settings (Ch.30.10)
+2. System generates a UUID-based secret key, stores its SHA-256 hash
+3. System creates (or reuses) a bot user record with:
+   - `role = 'agent'`
+   - `display_name = 'Bot of {owner.display_name}'`
+   - `api_key_id` = the new key's `api_key_id`
+   - `email = NULL` (agents have no email)
+4. Plaintext key is returned to the human exactly once
+5. Bot authenticates via `Authorization: Bearer {key}` header
+
+**Revocation Flow**
+1. Human revokes key via Account Settings
+2. System sets `revoked_at = NOW()`
+3. All subsequent API calls using this key receive `401 Unauthorized`
+4. Bot user records linked to this key remain for historical attribution but can no longer act
+
+**Relationship to Users**
+- One human can own multiple API keys
+- One API key can be shared by multiple bot users (e.g., different agents using the same credentials)
+- Bot actions are attributed to the bot user, which links back to the API key, which links to the human owner
+
+**Usage Pattern**
+```sql
+-- Authenticate an incoming API request
+SELECT ak.api_key_id, ak.owner_user_id, ak.valid_from, ak.valid_until, ak.revoked_at
+FROM api_keys ak
+WHERE ak.key_hash = ? -- SHA-256 of presented Bearer token
+  AND ak.valid_from <= NOW()
+  AND (ak.valid_until IS NULL OR ak.valid_until > NOW())
+  AND ak.revoked_at IS NULL;
+
+-- Find all bots linked to a key
+SELECT u.user_id, u.display_name
+FROM users u
+WHERE u.api_key_id = ?;
+
+-- List all keys for a human owner
+SELECT api_key_id, display_prefix, label, valid_from, valid_until, revoked_at, created_at
+FROM api_keys
+WHERE owner_user_id = ?
+ORDER BY created_at DESC;
+```
+
+---
+
 ## 19.4 Integrity Constraints and Key Guarantees
 
 - **One active major version per problem**: Enforced via `is_current` flag with unique partial index
@@ -1471,6 +1540,8 @@ VALUES (?, 'first_problem_welcome', NOW());
 - **One team per problem per event**: Enforced via unique constraint on (`problem_id`, `event_id`)
 - **Event registration uniqueness**: One registration per user per event via unique constraint
 - **Chat message soft delete**: Deletion sets `visible = FALSE`, preserving audit trail
+- **Bot-key linkage**: Agent users must have `api_key_id` NOT NULL; human users must have `api_key_id` NULL
+- **API key ownership**: `api_keys.owner_user_id` must reference a human user (role ≠ agent)
 
 ---
 
@@ -1494,7 +1565,6 @@ There is **no separate activity_log table**. The `decisions` table serves as the
 
 - All meaningful state changes are recorded as decisions
 - Activity views are projections over the decisions table
-- Comments are stored separately but are queryable alongside decisions
 - Dashboard "activity feeds" query recent decisions filtered by event or problem
 
 This design follows the principle: **decisions are the single source of truth**.
@@ -1531,8 +1601,8 @@ This separation ensures that transient operational states (pitch open, review op
 - **Chapter 13**: Problem Card UI → `problem_resources`, `problem_teams`, `problem_team_members`
 - **Chapter 14**: Live interaction modes → `event_live_context` (including timer fields for pace support)
 - **Chapter 16**: E-mail communication → trigger inventory, delivery constraints
-- **Chapter 31**: Team chat (replaces deprecated `comments` table)
-- **Chapter 18**: Authentication → `users` (auth fields), `auth_provider_catalog`, `users.show_on_contributor_wall`
+- **Chapter 31**: Team chat
+- **Chapter 18**: Authentication → `users` (auth fields), `auth_provider_catalog`, `users.show_on_contributor_wall`, `api_keys` (bot authentication)
 - **Chapter 20**: Traceability → `decisions` as activity log
 - **Chapter 25**: Interview findings → Reference tables pattern, response supersession model
 - **Chapter 29**: Events and locations → `events`, `partners`, `locations`, `rooms`, `event_registrations`, `event_attendance`

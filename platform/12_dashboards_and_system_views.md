@@ -102,6 +102,7 @@ Clicking on an event from the landing page or dashboard shows the **Event Detail
 **For Registered Users**
 Additional elements appear after registration:
 - "You're registered" confirmation
+- **"Cancel Registration"** button (sets `cancelled_at`, triggers waitlist invitation per Ch.29.6)
 - Breakout room links (if available)
 - Team assignments (if formed)
 
@@ -188,12 +189,16 @@ This section always reflects **exactly one** interactive context, even if other 
   - Link to Problem Card
 - Visual cues indicate whether a Problem has already been pitched, reviewed, or worked on
 
-**Team Chat Panel**
-- Displays most recent 10 messages across all problems for this event
-- Click any message to navigate to full Problem Card chat
-- Filter: event-wide or specific problem
-- No version filtering (shows all versions)
-- Quick post option for event-wide announcements
+**Chat Panel** (two tabs)
+- **Event Chat** tab (default during live events):
+  - Event-wide messages (`problem_id IS NULL`) — moderator announcements, system phase echoes, community links
+  - All authenticated participants can post (see Ch.31.16)
+  - Location filter: `[This Event ▼]` / `[All {City} Events]` — scrolls back through previous events at same location
+  - Quick post input at bottom for any participant
+- **Problem Activity** tab (default pre/post-event):
+  - Most recent 10 messages across all problems for this event
+  - Click any message to navigate to full Problem Card chat
+  - No version filtering (shows all versions)
 
 **Backlog Preview (Condensed)**
 - Small, non-intrusive list of:
@@ -243,7 +248,7 @@ A persistent panel (or expandable section) visible only to Moderators.
 **Desktop (≥768px)**: Inline panel with all decision buttons visible, or expandable sections
 **Mobile (<768px)**: Accordion sections by category (Decision #4 from template session)
 
-**Mobile Accordion Pattern** (25 decision types grouped into 7 categories):
+**Mobile Accordion Pattern** (26 decision types grouped into 8 categories):
 - **Quality Gate** (blue header): Accept, Request Changes, Reject
 - **Event Planning** (green header): Select for Event, Deselect for Event
 - **Sprint Planning** (purple header): Select for Coding, Deselect for Coding
@@ -280,7 +285,7 @@ This view supports **pre-event curation** and **in-event reprioritization**.
 **Live Decision Execution**
 - Moderators can execute decisions with a single click
 - Decisions are immediately logged and reflected across all views
-- Optional comment field appears contextually when required (e.g. rejections)
+- Optional rationale field appears contextually when required (e.g. rejections)
 
 **Activity Log Shortcut**
 - Compact feed of recent Decisions and Chat activity
@@ -444,6 +449,7 @@ Administrators are authenticated users with superset permissions over Moderators
   - Assessment usage
   - Show-up rates
 - Designed for analysis, not live operations
+- Each tabular view includes a **"Download CSV"** button for offline analysis and debugging (see Ch.15.3.4)
 
 ### Design Philosophy
 The Administrator Overview favors **clarity over speed**:

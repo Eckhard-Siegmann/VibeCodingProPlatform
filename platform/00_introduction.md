@@ -82,11 +82,13 @@ Team chat serves multiple purposes beyond real-time conversation:
 
 1. **Activity Log**: Chat documents changes and events (version transitions, team joins/retires, assessment openings) as system messages
 
-2. **Agent Workspace**: Agents can post comments, evaluations, and recommendations in chat. Agents are clearly marked (stored with `role = 'agent'` in the users table, rendered with `is_bot = TRUE` flag in chat messages)
+2. **Agent Workspace**: Agents can post messages, evaluations, and recommendations in chat. Agents are clearly marked (stored with `role = 'agent'` in the users table, rendered with `is_bot = TRUE` flag in chat messages)
 
 3. **Link Repository**: Larger evaluations, detailed analyses, and extensive content are posted as URLs (not inline). Chat becomes a curated index of valuable external resources
 
 4. **Knowledge Trail**: Chat history persists across problem versions, providing context for future participants and enabling longitudinal analysis
+
+5. **Event Channel**: A problem-detached chat per event where moderator announcements, phase transitions, and community links are shared. Messages accumulate across events at the same location, forming a persistent community timeline per city (see Chapter 31.16)
 
 ---
 

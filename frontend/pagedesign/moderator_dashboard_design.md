@@ -592,7 +592,7 @@ Moderators can quickly review insights from previous events and present a 2-minu
 - [ ] Decision accordion renders 7 categories
 - [ ] Category headers color-coded correctly
 - [ ] Only one category open at a time
-- [ ] All 25 decision buttons present
+- [ ] All 26 decision buttons present
 - [ ] Comment modal appears for required decisions
 - [ ] Decision submission works (creates decision in DB)
 - [ ] Toast notifications shown

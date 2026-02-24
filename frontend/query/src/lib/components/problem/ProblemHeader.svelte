@@ -39,7 +39,7 @@
 		onTitleUpdate
 	}: Props = $props();
 
-	let localTitle = $state(title);
+	let localTitle = $state('');
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 

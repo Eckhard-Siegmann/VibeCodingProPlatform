@@ -65,7 +65,12 @@
 		}
 	];
 
-	let items = $state(data?.items ?? demoItems);
+	let items = $state(demoItems as ItemData[]);
+
+	// Sync from server data when available
+	$effect(() => {
+		if (data?.items) items = data.items;
+	});
 
 	// Editor state
 	let editorOpen = $state(false);

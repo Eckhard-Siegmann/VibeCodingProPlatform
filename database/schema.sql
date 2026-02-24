@@ -38,7 +38,7 @@ CREATE TABLE action_state_catalog (
 );
 
 -- 19.2.3 decision_type_catalog
--- Defines all decision types that can be recorded (25 types across 8 categories)
+-- Defines all decision types that can be recorded (26 types across 8 categories)
 CREATE TABLE decision_type_catalog (
   type_key TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
@@ -258,12 +258,30 @@ CREATE TABLE users (
   show_on_contributor_wall INTEGER NOT NULL DEFAULT 1 CHECK(show_on_contributor_wall IN (0,1)),  -- Ch.33: Opt-out from public wall
   show_first_time_hints INTEGER NOT NULL DEFAULT 1 CHECK(show_first_time_hints IN (0,1)),  -- Ch.32: Show onboarding hints
   audio_cues_enabled INTEGER NOT NULL DEFAULT 0 CHECK(audio_cues_enabled IN (0,1)),  -- Ch.14.5.1: Countdown timer audio alerts
+  api_key_id TEXT REFERENCES api_keys(api_key_id),  -- Links bot users to their API key (NULL for humans)
   created_at TEXT NOT NULL,
   last_login_at TEXT
 );
 
 -- 19.3.2 sessions table REMOVED
 -- All participation requires authentication (mandatory user_id)
+
+-- 19.3.39 api_keys
+-- API keys for bot authentication (created and revoked by human users)
+-- Temporal validity follows waitlist_expires_at pattern from event_registrations
+-- Note: users.api_key_id references this table; circular dependency resolved by
+-- creating api_keys after users (SQLite validates FKs at DML time, not DDL time)
+CREATE TABLE api_keys (
+  api_key_id TEXT PRIMARY KEY,
+  owner_user_id TEXT NOT NULL REFERENCES users(user_id),
+  key_hash TEXT NOT NULL,  -- SHA-256 hash of the API key (plaintext never stored)
+  display_prefix TEXT NOT NULL,  -- First 8 chars of key for identification in UI
+  label TEXT,  -- Human-readable label (e.g., "My Claude bot")
+  valid_from TEXT NOT NULL,  -- Key becomes active at this time
+  valid_until TEXT,  -- Key expires at this time; NULL = no expiry
+  revoked_at TEXT,  -- Set when owner revokes; NULL = not revoked
+  created_at TEXT NOT NULL
+);
 
 -- 19.3.3 partners
 -- Partner organizations that host or co-host events
@@ -518,10 +536,7 @@ CREATE TABLE decisions (
   created_at TEXT NOT NULL
 );
 
--- 19.3.20 comments table REMOVED (DEPRECATED)
--- Replaced by chat_messages table (see Chapter 31)
-
--- 19.3.21 event_problem_queue
+-- 19.3.19 event_problem_queue
 -- Problem-event associations for backlog management
 CREATE TABLE event_problem_queue (
   queue_id TEXT PRIMARY KEY,
@@ -584,7 +599,7 @@ CREATE TABLE lessons_learned (
 );
 
 --------------------------------------------------------------------------------
--- CHAT TABLES (replaces deprecated comments)
+-- CHAT TABLES
 --------------------------------------------------------------------------------
 
 -- 19.3.25 chat_messages
@@ -755,3 +770,10 @@ CREATE INDEX idx_milestones_by_user ON user_milestones(user_id);
 
 -- User Hints (Ch.32)
 CREATE INDEX idx_hints_by_user ON user_hint_dismissals(user_id);
+
+-- API Keys (Ch.18.13, Ch.19.3.39)
+CREATE INDEX idx_api_keys_by_owner ON api_keys(owner_user_id);
+CREATE INDEX idx_api_keys_active ON api_keys(key_hash)
+WHERE revoked_at IS NULL;
+CREATE INDEX idx_users_by_api_key ON users(api_key_id)
+WHERE api_key_id IS NOT NULL;

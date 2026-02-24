@@ -68,10 +68,10 @@ Importantly:
 
 ### Decision Type Taxonomy
 
-The system defines 25 decision types across 8 categories:
+The system defines 26 decision types across 8 categories:
 
-**Lifecycle (4)**: Problem creation and evolution
-- `problem_created`, `problem_cloned`, `problem_submitted`, `problem_updated`
+**Lifecycle (5)**: Problem creation and evolution
+- `problem_created`, `problem_cloned`, `problem_submitted`, `problem_updated`, `problem_archived`
 
 **Quality Gate (3)**: Moderator review outcomes
 - `quality_gate_accepted`, `quality_gate_rejected`, `quality_gate_needs_changes`
@@ -103,11 +103,11 @@ See Chapter 19 for the complete `decision_type_catalog` with state effect mappin
 Every Decision records **who made it** and **in what capacity**.
 
 Authority is determined by role and context:
-- Problem Owners can submit, update, and comment on their own Problems.
+- Problem Owners can submit, update, and post in team chat on their own Problems.
 - Moderators can curate, select, defer, and open/close pitch or review phases.
 - Administrators can perform all moderator actions.
 - Agents can only create **non-binding** decisions (recommendations).
-- Observers may only comment.
+- Observers may post in team chat.
 
 Group decisions are supported without introducing a separate actor type:
 - A single moderator may record a decision that represents a *group consensus*.
@@ -126,7 +126,7 @@ The Decision Log:
 - Is strictly append-only.
 - Preserves full chronological order.
 - Includes binding and non-binding decisions.
-- Does **not** include comments (qualitative feedback is captured via team chat in the `chat_messages` table per Chapter 31).
+- Does **not** include qualitative feedback (captured via team chat in the `chat_messages` table per Chapter 31).
 - Is never rewritten, compacted, or summarized destructively.
 
 From the Decision Log, the system derives:
@@ -137,7 +137,7 @@ From the Decision Log, the system derives:
 
 In the Problem Card UI, the Decision Log is rendered as a **decision history timeline**, allowing users to:
 - Trace the evolution of a Problem across versions and events.
-- Understand rationale through optional comments.
+- Understand rationale through decision rationale entries and related chat posts (Chapter 31).
 - Distinguish recommendations from authoritative outcomes.
 
 The Decision Log is the system’s **single source of truth** for governance, accountability, and post-hoc analysis. All higher-level views, filters, and dashboards are projections over this log.

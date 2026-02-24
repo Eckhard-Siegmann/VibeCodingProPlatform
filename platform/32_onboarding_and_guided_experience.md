@@ -325,7 +325,7 @@ All preferences default to TRUE (opt-out model) except `default_dashboard_view` 
 | Notification Type | Default | Description |
 |-------------------|---------|-------------|
 | Event reminders | ON | 24h before registered events |
-| Problem feedback | ON | When moderator comments on your problem |
+| Problem feedback | ON | When moderator posts on your problem |
 | Team activity | ON | When teammates post in chat |
 | Mention alerts | ON | When @mentioned in chat |
 

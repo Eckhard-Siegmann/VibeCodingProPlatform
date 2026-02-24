@@ -2611,7 +2611,7 @@ interface Props {
 - ⬜ SearchInput (full-text search, Ch.12.7, low priority)
 - ⬜ NotificationCenter (centralized notifications, future)
 - ⬜ UserProfile (profile pages, future)
-- ⬜ CommentThread (if needed beyond chat, unlikely)
+- ⬜ ChatThread (threaded replies within team chat, future)
 
 ---
 

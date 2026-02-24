@@ -40,7 +40,7 @@ Once a Major Version is created:
 Rollbacks do not revert history. Instead:
 - An earlier Major Version can be promoted again.
 - This creates a **new Major Version** whose content is identical to the earlier one.
-- The rollback is recorded as an explicit act, with an auto-generated or user-provided comment.
+- The rollback is recorded as an explicit act, with an auto-generated or user-provided rationale.
 
 This preserves a linear, auditable history while allowing recovery from undesirable changes.
 

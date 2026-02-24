@@ -5,13 +5,14 @@ import {
 	getProblemVersions,
 	getCurrentVersion,
 	getProblemVersion,
-	getDecisionHistory,
 	getAssessmentsForProblem
 } from '$lib/server/repositories/problems';
+import { getDatabase } from '$lib/server/db';
 import { getAuthenticatedUser, canAccessPrivateView } from '$lib/server/auth';
 
 export const load: PageServerLoad = async ({ params, url }) => {
 	const { slug } = params;
+	const db = getDatabase();
 
 	// Get authenticated user (MVP: hardcoded)
 	const user = getAuthenticatedUser();
@@ -53,13 +54,14 @@ export const load: PageServerLoad = async ({ params, url }) => {
 
 	const isArchivedView = selectedMajorVersion !== problem.current_major_version;
 
-	// Get decisions and assessments
-	const decisions = getDecisionHistory(problem.problem_id);
+	// Get assessments
 	const assessments = getAssessmentsForProblem(problem.problem_id);
 
 	// Compute visibility flags
 	const viewType = problem.view_type;
 	const readinessState = problem.current_readiness_state;
+	const userRoleRecord = db.prepare('SELECT role FROM users WHERE user_id = ?').get(user.user_id) as any;
+	const isModerator = userRoleRecord?.role === 'moderator' || userRoleRecord?.role === 'admin';
 
 	const flags = {
 		showWarningBanner: viewType === 'private',
@@ -68,8 +70,11 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		showSubmitButton: viewType === 'private' && readinessState === 'draft',
 		showModifyButton: viewType === 'private' && readinessState !== 'draft',
 		showCloneButton: viewType === 'private',
-		isReadOnly: viewType === 'public' || readinessState !== 'draft' || isArchivedView
+		isReadOnly: viewType === 'public' || readinessState !== 'draft' || isArchivedView,
+		isModerator: isModerator
 	};
+
+	const eventId = 'event-feb-2026';
 
 	return {
 		problem: {
@@ -84,11 +89,11 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		},
 		currentVersion: selectedVersion,
 		versions,
-		decisions,
 		assessments,
 		flags,
 		isArchivedView,
 		selectedMajorVersion,
-		user
+		user,
+		eventId
 	};
 };

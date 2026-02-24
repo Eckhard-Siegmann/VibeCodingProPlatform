@@ -19,7 +19,7 @@
 		{ event_slug: 'cologne-mar-2026', title: 'VibeCoding Professionals Meetup Cologne (Mar 2026)' }
 	];
 
-	let events = data?.events ?? demoEvents;
+	let events = $derived(data?.events ?? demoEvents);
 
 	// Handle import
 	async function handleImport(rows: CSVRow[], eventSlug?: string): Promise<ImportResult> {

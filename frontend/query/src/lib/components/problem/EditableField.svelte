@@ -28,7 +28,7 @@
 		onUpdate
 	}: Props = $props();
 
-	let localValue = $state(String(value));
+	let localValue = $state('');
 	let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle');
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 

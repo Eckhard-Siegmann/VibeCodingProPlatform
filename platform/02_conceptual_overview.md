@@ -78,7 +78,7 @@ At a conceptual level, a Problem may pass through the following lifecycle phases
   The Problem is actively addressed during an Event, typically involving coding, experimentation, or agent orchestration.
 
 - **Reflection and Follow-up**
-  Additional assessments, comments, or decisions may occur after the Event, including lessons learned or deferred planning.
+  Additional assessments, feedback, or decisions may occur after the Event, including lessons learned or deferred planning.
 
 Crucially, the lifecycle is **not enforced as a rigid workflow**. The system records *what happened*, not *what should have happened*. This makes it suitable for exploratory, agentic, and research-oriented contexts where strict process enforcement would be counterproductive.
 
@@ -145,7 +145,7 @@ This conceptual overview provides the vocabulary and mental model for the entire
 - The **appendices** provide user stories (Ch.23), bootstrap data (Ch.24), interview findings (Ch.25), UI addendum (Ch.26), and state diagrams (Ch.27-28).
 - The **events, partners, and locations** are specified in Chapter 29.
 - The **registration and onboarding** is specified in Chapter 30.
-- The **team chat and collaboration** (replacing deprecated comments) is specified in Chapter 31.
+- The **team chat and collaboration** is specified in Chapter 31.
 - The **onboarding and guided experience** is specified in Chapter 32.
 - The **participant experience and emotional design** (including contributor recognition) is specified in Chapter 33.
 

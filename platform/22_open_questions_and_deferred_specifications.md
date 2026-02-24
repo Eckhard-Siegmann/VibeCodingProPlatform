@@ -150,7 +150,7 @@ Its purpose is to ensure that future evolution remains intentional, transparent,
 
 **Original question**: When a problem is dropped or rejected, should its queue entry be automatically removed?
 
-**Resolution**: Ejection decisions (`deselected_for_event`, `quality_gate_rejected`, `dropped_low_relevance`, `dropped_low_quality`) remove from queue and re-compact indices. Closing decisions transition queue state to `completed`. Deferral decisions leave queue entries untouched. See **Chapter 19, §19.3.20** for the ejection cleanup invariant.
+**Resolution**: Ejection decisions (`deselected_for_event`, `quality_gate_rejected`, `dropped_low_relevance`, `dropped_low_quality`) remove from queue and re-compact indices. Closing decisions transition queue state to `completed`. Deferral decisions leave queue entries untouched. See **Chapter 19, §19.3.19** for the ejection cleanup invariant.
 
 ### Decision Type Vocabulary Consistency *(RESOLVED)*
 

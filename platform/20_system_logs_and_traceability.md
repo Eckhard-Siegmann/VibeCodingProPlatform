@@ -47,7 +47,7 @@ Each decision entry records:
 
 **Note on role traceability**: Decision actor roles are derived from the `users.role` field rather than stored directly in decisions. For transparency, team chat logs document the active contextual role when significant decisions are made (e.g., "Eva (moderator) selected problem for event").
 
-**Qualitative feedback** is captured via the team chat system in the `chat_messages` table (Chapter 31) and can be queried alongside decisions for a complete activity view. Historical comments from the deprecated `comments` table remain available for audit purposes only.
+**Qualitative feedback** is captured via the team chat system in the `chat_messages` table (Chapter 31) and can be queried alongside decisions for a complete activity view.
 
 ---
 

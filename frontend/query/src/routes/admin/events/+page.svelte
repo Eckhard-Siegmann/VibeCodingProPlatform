@@ -117,10 +117,18 @@
 		}
 	];
 
-	let events = $state(data?.events ?? demoEvents);
-	let partners = $state(data?.partners ?? demoPartners);
-	let rooms = $state(data?.rooms ?? demoRooms);
-	let moderators = $state(data?.moderators ?? demoModerators);
+	let events = $state(demoEvents as EventWithStats[]);
+	let partners = $state(demoPartners as Partner[]);
+	let rooms = $state(demoRooms as Room[]);
+	let moderators = $state(demoModerators as User[]);
+
+	// Sync from server data when available
+	$effect(() => {
+		if (data?.events) events = data.events;
+		if (data?.partners) partners = data.partners;
+		if (data?.rooms) rooms = data.rooms;
+		if (data?.moderators) moderators = data.moderators;
+	});
 
 	// Editor state
 	let editorOpen = $state(false);

@@ -89,6 +89,27 @@
 			return false;
 		}
 	}
+
+	async function handleModeratorDecision(decisionType: string, rationale?: string) {
+		const response = await fetch(`/api/events/${data.eventId}/decisions`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				problem_id: data.problem.problem_id,
+				decision_type: decisionType,
+				rationale,
+				timer_duration_minutes: decisionType.includes('opened') ? 5 : undefined
+			})
+		});
+
+		if (response.ok) {
+			await invalidateAll();
+			toastSuccess('Decision recorded', decisionType.replace(/_/g, ' '));
+		} else {
+			const error = await response.json();
+			toastError('Failed to record decision', error.error || 'Unknown error');
+		}
+	}
 </script>
 
 <svelte:head>
@@ -110,5 +131,6 @@
 		onSubmit={handleSubmit}
 		onModify={handleModify}
 		onClone={handleClone}
+		onDecision={handleModeratorDecision}
 	/>
 </PageContainer>

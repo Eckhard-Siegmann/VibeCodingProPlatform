@@ -73,8 +73,14 @@
 		}
 	];
 
-	let inventories = $state(data?.inventories ?? demoInventories);
-	let availableItems = $state(data?.availableItems ?? demoAvailableItems);
+	let inventories = $state(demoInventories);
+	let availableItems = $state(demoAvailableItems);
+
+	// Sync from server data when available
+	$effect(() => {
+		if (data?.inventories) inventories = data.inventories;
+		if (data?.availableItems) availableItems = data.availableItems;
+	});
 
 	// Editor state
 	let editorOpen = $state(false);

@@ -269,7 +269,7 @@ Start: Event ends
 
 Steps:
 1. Complete post-event review assessments
-2. Add valuable chat comments
+2. Add valuable chat messages
 3. Add lessons learned
 
 Emotional context: Contribution without coding pressure.

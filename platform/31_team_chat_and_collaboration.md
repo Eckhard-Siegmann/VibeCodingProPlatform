@@ -1,6 +1,6 @@
 # 31. Team Chat and Collaboration
 
-This chapter specifies the **team chat system** that replaces the previous comment system (formerly Chapter 16, now repurposed for e-mail communication). Chat provides real-time collaboration, team formation, and persistent discussion around problems.
+This chapter specifies the **team chat system**. Chat provides real-time collaboration, team formation, and persistent discussion around problems.
 
 ---
 
@@ -15,15 +15,6 @@ The team chat system provides:
 - **@mentions** for notifications
 - **Emoji reactions**
 - **Clear bot differentiation** for system and AI messages
-
-### Replaces Comments
-
-The previous `comments` table is **deprecated**. All qualitative feedback and discussion now flows through the chat system, which provides:
-
-- Richer context (problem, event, team, situation)
-- Real-time updates
-- Threading and reactions
-- Better discoverability via filters
 
 ---
 
@@ -51,7 +42,8 @@ Chat is a **filtered view** over atomic messages stored in `chat_messages`. Ther
 |------|---------|
 | Problem Discussion | `problem_id = X` |
 | Team Chat | `team_id = X` |
-| Event-Wide | `event_id = X AND problem_id IS NULL` |
+| Event Chat | `event_id = X AND problem_id IS NULL` |
+| Location Community | `problem_id IS NULL AND event_id IN (events at location L)` |
 | Moderator Posts Only | `problem_id = X AND role = 'moderator'` |
 | PO Posts Only | `problem_id = X AND role = 'problem_owner'` |
 | Posts with URLs | `problem_id = X AND url_disclosed = TRUE` |
@@ -70,11 +62,11 @@ Each chat message is an atomic unit with rich metadata:
 | `user_id` | UUID | Author |
 | `problem_id` | UUID? | Associated problem (nullable) |
 | `problem_version_id` | UUID? | Version context for display |
-| `major_version` | INTEGER | **Required** - Major version for efficient filtering |
+| `major_version` | INTEGER? | Nullable — NULL for event-wide messages (no problem); set for problem-scoped messages |
 | `minor_version` | INTEGER? | Nullable - Minor version from repo snapshot (GitHub may be unavailable per Ch.25) |
 | `event_id` | UUID? | Associated event (nullable) |
 | `team_id` | UUID? | Associated team (nullable) |
-| `context_situation` | Enum | pre_discussion, pitch_discussion, while_building, while_reviewing |
+| `context_situation` | Enum | pre_discussion, pitch_discussion, while_building, while_reviewing, event_announcement |
 | `content` | Text | Message content (**max 2000 characters**) |
 | `reply_to_message_id` | UUID? | Parent message for threading |
 | `url_disclosed` | Boolean | Message contains URL (auto-detected) |
@@ -88,7 +80,7 @@ Each chat message is an atomic unit with rich metadata:
 
 ### Version Tracking Rationale
 
-Chat messages store **both** `major_version` and `minor_version` directly for efficient filtering and version-scoped display. See Chapter 19.3.24 for the complete rationale on direct version storage.
+For problem-scoped messages, `major_version` and `minor_version` are stored directly for efficient filtering and version-scoped display. For event-wide messages (`problem_id IS NULL`), both version fields are NULL. See Chapter 19.3.23 for the complete rationale on direct version storage.
 
 ### Content Limits
 
@@ -96,7 +88,7 @@ Chat messages store **both** `major_version` and `minor_version` directly for ef
 |------------|-------|-----------|
 | Max length | 2000 characters | Encourages concise communication |
 | Min length | 1 character | Prevents empty messages |
-| Attachments | Not supported | Use external links instead (see 31.12) |
+| Attachments | Not supported | Use external links instead (see 31.14) |
 
 ### URL Detection
 
@@ -115,8 +107,9 @@ Detection is context-independent (applies even in code blocks).
 | `pitch_discussion` | During pitch phase |
 | `while_building` | During coding sprint |
 | `while_reviewing` | During review phase |
+| `event_announcement` | Event-wide messages not tied to a problem (§31.16) |
 
-Context is set based on current event phase when message is posted.
+The first four contexts are problem-centric (used when `problem_id` is set). `event_announcement` is used for event-wide messages where `problem_id IS NULL`. Context is set based on current event phase when message is posted.
 
 ---
 
@@ -408,7 +401,7 @@ When retired coder clicks "Rejoin Team":
 
 ### Chat Display Rules
 
-Message author display is determined at render time based on **current** membership status. See Chapter 19.3.22 for the complete chat display role conventions table.
+Message author display is determined at render time based on **current** membership status. See Chapter 19.3.21 for the complete chat display role conventions table.
 
 ### WhatsApp-style System Messages
 
@@ -627,12 +620,12 @@ When state changes, system posts:
 When the hacking session is closed:
 1. Status turns to **Inactive**
 2. Onboarded participants may drop from team
-3. Others can write review comments as observers
+3. Others can write review messages as observers
 4. Chat continues to function (as discussion log)
 
 ---
 
-## 31.13 Valuable Content Flags
+## 31.12 Valuable Content Flags
 
 ### Purpose
 
@@ -660,7 +653,7 @@ WHERE valuable_insight = TRUE OR valuable_link = TRUE
 
 ---
 
-## 31.14 Community Guidelines
+## 31.13 Community Guidelines
 
 ### Displayed During Onboarding
 
@@ -681,7 +674,7 @@ Moderators can:
 
 ---
 
-## 31.15 No Attachments
+## 31.14 No Attachments
 
 ### Design Decision
 
@@ -703,11 +696,11 @@ Users share links to:
 
 ---
 
-## 31.16 Social Presence Indicators
+## 31.15 Social Presence Indicators
 
 During live events and ongoing collaboration, users benefit from knowing "who's here right now." Social presence creates momentum and reduces isolation.
 
-### 31.16.1 Team Online Status
+### 31.15.1 Team Online Status
 
 Display the number of team members currently viewing the problem:
 
@@ -730,7 +723,7 @@ Team (3 of 5 online)
 - Server maintains `last_seen_at` per user per problem
 - Online status derived: `last_seen_at >= NOW() - 30 seconds`
 
-### 31.16.2 "Currently Viewing" Indicator
+### 31.15.2 "Currently Viewing" Indicator
 
 On the Problem Card, show who else is viewing:
 
@@ -743,7 +736,7 @@ On the Problem Card, show who else is viewing:
 - Exclude current user from count
 - Update via polling (3s during events, 10s otherwise)
 
-### 31.16.3 Last Active Timestamps
+### 31.15.3 Last Active Timestamps
 
 For team members and chat participants, show recency:
 
@@ -755,7 +748,7 @@ For team members and chat participants, show recency:
 | 1-7 days | "{N}d ago" |
 | > 7 days | "inactive" |
 
-### 31.16.4 Typing Indicators (Future Direction)
+### 31.15.4 Typing Indicators (Future Direction)
 
 Show when team members are composing messages:
 
@@ -771,7 +764,7 @@ Eva is typing...
 
 **Note**: Not MVP scope due to additional real-time infrastructure requirements.
 
-### 31.16.5 Presence Data Model
+### 31.15.5 Presence Data Model
 
 **Lightweight ephemeral tracking.** Presence is tracked via application-layer cache only (no database persistence):
 
@@ -791,12 +784,118 @@ TTL: 60 seconds
 
 **Note**: The deprecated `sessions` table has been removed (Ch.19.3.2). Presence tracking is ephemeral and not persisted to the database, which aligns with the privacy principle that historical presence is not audited.
 
-### 31.16.6 Privacy Considerations
+### 31.15.6 Privacy Considerations
 
 - Presence is visible only to authenticated users
 - No opt-out for presence (minimal privacy impact)
 - Presence data not stored persistently (ephemeral)
 - Historical presence not tracked (no audit of "who was online when")
+
+---
+
+## 31.16 Event-Wide Chat Channel
+
+This section specifies the **event-wide chat channel** — a problem-detached discussion space where moderator announcements, system phase transitions, and community sharing are captured per event. It replaces the previously underspecified "Announce" action (Ch.14.5.5) and gives concrete behavior to the event-wide filter defined in §31.2.
+
+### 31.16.1 Purpose
+
+Each event has a dedicated chat channel that is **not attached to any specific problem**. It serves as:
+
+- **Announcement channel**: Moderator announcements during live events (user story M17)
+- **Event activity log**: System-generated messages echoing phase transitions (pitch opened, review closed, etc.)
+- **Community sharing space**: Participants share links, insights, and general discussion relevant to the event or community
+
+All authenticated users registered for the event (or moderators with global scope) can post. This follows the "Pros for Pros" philosophy — no gatekeeper controls who can contribute.
+
+All message features from §31.4 apply: threading, reactions, @mentions, editing (within 15 min), soft deletion.
+
+### 31.16.2 Message Routing
+
+Event-wide messages use the following `chat_messages` column values:
+
+| Column | Value |
+|--------|-------|
+| `problem_id` | `NULL` |
+| `problem_version_id` | `NULL` |
+| `major_version` | `NULL` |
+| `minor_version` | `NULL` |
+| `event_id` | Current event UUID |
+| `team_id` | `NULL` |
+| `context_situation` | `event_announcement` |
+
+Human-authored messages have `is_bot = FALSE`. System phase echoes have `is_bot = TRUE`.
+
+### 31.16.3 System Phase Echoes
+
+When live decisions fire, the system posts a bot message to the event-wide chat **in addition to** any existing problem-specific messages (§31.7, §31.11). This creates a unified activity log in one place.
+
+| Decision | Event-wide echo message |
+|----------|------------------------|
+| `opened_for_pitch_assessment` | `─── {ts} Pitch opened: "{Problem Title}" ───` |
+| `closed_for_pitch_assessment` | `─── {ts} Pitch closed: {N} votes collected ───` |
+| `selected_for_coding` | `─── {ts} "{Problem Title}" selected for coding ───` |
+| `deselected_for_coding` | `─── {ts} "{Problem Title}" deselected from coding ───` |
+| `opened_for_review` | `─── {ts} Review opened: "{Problem Title}" ───` |
+| `closed_for_review` | `─── {ts} Review closed ───` |
+
+Timestamp format follows §31.7: `DD.MM.YYYY HH:MM` (European format with full date).
+
+**Rationale**: Problem-specific chat shows transitions relevant to that team. The event-wide channel shows the full event narrative — all phase transitions interleaved with announcements and community messages — so any participant can see what happened at a glance.
+
+### 31.16.4 Location Community Timeline
+
+The event-wide channel extends beyond a single event. Messages accumulate across events at the same location, forming a **persistent community timeline per city**.
+
+**Behavior**:
+- Aggregates event-wide messages from all events at the same location
+- Ordered chronologically, newest first
+- Event boundaries rendered as visual separators:
+  ```
+  ═══ VibeCoding Cologne March 2026 ═══
+  Moderator: Welcome back! Tonight we have 4 problems.
+  ─── 15.03.2026 18:15 Pitch opened: "API Rate Limiter" ───
+  Eva: Has anyone tried the new Claude tool for this?
+  ...
+  ═══ VibeCoding Cologne February 2026 ═══
+  Moderator: Great turnout tonight — 32 participants!
+  ...
+  ```
+- **Cologne sees Cologne**, Aachen sees Aachen — no cross-location mixing in the timeline
+- Location derived via `events → rooms → locations` (see Ch.19.3.23 for query pattern)
+- Valuable links and insights flagged in previous events remain discoverable
+
+**UI**: This is a filter within the Event Chat tab (see §31.16.5), not a separate page: `[This Event ▼]` / `[All {City} Events]`.
+
+### 31.16.5 UI Surface
+
+**Event Dashboard (Ch.12.4)** — The chat panel gains two tabs:
+
+| Tab | Content | Default when |
+|-----|---------|-------------|
+| **Event Chat** | Event-wide messages (`problem_id IS NULL`) — announcements, phase echoes, community links | During live events |
+| **Problem Activity** | Most recent 10 messages across all problems for this event (existing behavior) | Pre/post-event |
+
+Within the Event Chat tab, a location filter provides timeline scope:
+
+| Filter | Query |
+|--------|-------|
+| This Event (default) | `event_id = X AND problem_id IS NULL` |
+| All {City} Events | `problem_id IS NULL AND event_id IN (events at location)` |
+
+**Moderator Dashboard (Ch.12.5)** — The "Announce" quick action (Ch.14.5.5) posts a message directly into the event-wide chat. The moderator types a message and submits; it appears in the Event Chat tab with moderator styling (§31.6).
+
+**Quick post input**: Below the event chat message list, all authenticated participants see a message input field identical to the problem chat input. No special privileges required to post.
+
+### 31.16.6 Access Control
+
+| User Type | Can View | Can Post | Notes |
+|-----------|----------|----------|-------|
+| Anonymous | No | No | Must register per Ch.30 |
+| Authenticated (registered for event) | Yes | Yes | Full participation |
+| Authenticated (not registered) | Yes | No | Can read but not contribute |
+| Moderator/Admin | Yes | Yes | Global scope; can post in any event's chat |
+
+Moderators can soft-delete any message (same as problem chat per §31.4). Moderator messages rendered with distinct styling (§31.6).
 
 ---
 
@@ -866,11 +965,13 @@ Currently not implemented due to limited scale (2x/month, ~50 messages/problem):
 ## 31.18 Relationship to Other Chapters
 
 - **Chapter 4**: Problem Cards display chat
+- **Chapter 12**: Event Dashboard chat panel with Event Chat and Problem Activity tabs
 - **Chapter 13**: Problem Card UI with chat section
-- **Chapter 16**: E-mail communication (chapter repurposed; deprecated `comments` table retained in schema for historical data only)
+- **Chapter 14**: Live interaction modes — phase transitions echo into event-wide chat (§31.16.3)
+- **Chapter 16**: E-mail communication
 - **Chapter 18**: Authentication required for chat
-- **Chapter 19**: Data model for chat tables
-- **Chapter 29**: Events context for messages
+- **Chapter 19**: Data model for chat tables (`chat_messages`, `chat_context_catalog`)
+- **Chapter 29**: Events context for messages; location derivation for community timeline
 - **Chapter 30**: Registration required for chat
 - **Chapter 32**: First-time chat guidance in onboarding
 - **Chapter 33**: Chat reactions (👍, 💡) trigger contributor points

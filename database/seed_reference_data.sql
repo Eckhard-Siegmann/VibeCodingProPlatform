@@ -31,13 +31,14 @@ INSERT INTO action_state_catalog (state_key, display_name, description, is_termi
   ('dropped', 'Dropped', 'Removed from consideration, will not continue', 1, 5, 1, '2026-01-30T00:00:00Z'),
   ('closed', 'Closed', 'Completed successfully, no further action needed', 1, 6, 1, '2026-01-30T00:00:00Z');
 
--- 19.2.3 Decision types (25 types across 8 categories per Ch.10.3, Ch.19.2.3)
--- Category: lifecycle (4)
+-- 19.2.3 Decision types (26 types across 8 categories per Ch.10.3, Ch.19.2.3)
+-- Category: lifecycle (5)
 INSERT INTO decision_type_catalog (type_key, display_name, description, category, affects_readiness, affects_action, is_active, created_at) VALUES
   ('problem_created', 'Problem Created', 'New problem created by Problem Owner', 'lifecycle', 1, 1, 1, '2026-01-30T00:00:00Z'),
   ('problem_cloned', 'Problem Cloned', 'Problem cloned from existing problem', 'lifecycle', 1, 1, 1, '2026-01-30T00:00:00Z'),
   ('problem_submitted', 'Problem Submitted', 'Problem submitted for quality gate review', 'lifecycle', 1, 0, 1, '2026-01-30T00:00:00Z'),
-  ('problem_updated', 'Problem Updated', 'New major version created after changes', 'lifecycle', 1, 0, 1, '2026-01-30T00:00:00Z');
+  ('problem_updated', 'Problem Updated', 'New major version created after changes', 'lifecycle', 1, 0, 1, '2026-01-30T00:00:00Z'),
+  ('problem_archived', 'Problem Archived', 'Problem archived by PO, hidden from default listings', 'lifecycle', 0, 0, 1, '2026-01-30T00:00:00Z');
 
 -- Category: quality_gate (3)
 INSERT INTO decision_type_catalog (type_key, display_name, description, category, affects_readiness, affects_action, is_active, created_at) VALUES
@@ -87,6 +88,7 @@ INSERT INTO decision_state_effects (decision_type, new_readiness_state, new_acti
   ('problem_cloned', 'draft', 'backlog', NULL),
   ('problem_submitted', 'submitted', NULL, NULL),
   ('problem_updated', 'draft', NULL, NULL),
+  ('problem_archived', NULL, NULL, NULL),
   ('quality_gate_accepted', 'ready', NULL, NULL),
   ('quality_gate_rejected', 'rejected', NULL, NULL),
   ('quality_gate_needs_changes', 'needs_changes', NULL, NULL),

@@ -150,7 +150,7 @@ The system distinguishes between:
   Actions that change the authoritative state of a Problem or event. These are recorded as Decisions with `is_binding = true`.
 
 - **Non-binding actions**  
-  Recommendations, assessments, comments, or preparatory actions that inform later decisions but do not change state.
+  Recommendations, assessments, chat messages, or preparatory actions that inform later decisions but do not change state.
 
 This distinction is critical for:
 - Auditability

@@ -28,7 +28,12 @@
 		...restProps
 	}: Props = $props();
 
-	let isOpen = $state(expanded);
+	let isOpen = $state(false);
+
+	// Sync with prop
+	$effect(() => {
+		isOpen = expanded;
+	});
 </script>
 
 <div class={cn('', className)} {...restProps}>

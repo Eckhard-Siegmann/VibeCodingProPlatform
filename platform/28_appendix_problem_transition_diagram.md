@@ -128,6 +128,7 @@ Per `decision_state_effects` table (Ch.19.2.4):
 | `problem_cloned` | draft | backlog | — |
 | `problem_submitted` | submitted | — | — |
 | `problem_updated` | draft | — | — |
+| `problem_archived` | — | — | — |
 | `quality_gate_accepted` | ready | — | — |
 | `quality_gate_rejected` | rejected | — | — |
 | `quality_gate_needs_changes` | needs_changes | — | — |
@@ -218,6 +219,7 @@ stateDiagram-v2
 | Constraint | Rule | Reference |
 |------------|------|-----------|
 | Single active pitch | At most one problem in pitch mode at a time | Ch.14.3 |
+| Auto-close on new pitch | Opening a new pitch auto-closes the previous one via `closed_for_pitch_assessment` | Ch.14.3 |
 | Review concurrency | Multiple review assessments may be open, but only one highlighted as interactive on the dashboard | Ch.14.3 |
 | Moderator-only transitions | All live context transitions require moderator or admin role | Ch.3, Ch.10.4 |
 | No auto-open | Modes are never opened automatically; explicit moderator intent required | Ch.14.3 |

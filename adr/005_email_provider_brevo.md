@@ -1,4 +1,8 @@
-# Architecture Decision Record: Email Delivery Infrastructure
+# ADR 005: Email Provider — Brevo
+
+## Status
+
+**Accepted** (2026-02-05)
 
 ## Context
 The platform generates several transactional and informational outbound emails: onboarding OTPs, event invitations, confirmation links, and waitlist allocations ([as defined in Platform Spec Chapter 16](../platform/16_e-mail_communication.md)). 
@@ -36,3 +40,9 @@ The backend must send requests in this approximate shape without injecting HTML 
   }
 }
 ```
+
+## References
+
+- Platform Spec Chapter 16: E-Mail Communication (trigger inventory, delivery constraints, idempotency)
+- Platform Spec Chapter 18: Authentication — OTP, password reset, email confirmation flows
+- Platform Spec Chapter 30: Registration and Onboarding — welcome email, waitlist notification

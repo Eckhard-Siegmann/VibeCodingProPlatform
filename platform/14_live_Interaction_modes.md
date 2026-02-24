@@ -103,6 +103,15 @@ For each live mode (Pitch or Review), the system supports:
   - At most one *interactive* Pitch is open.
   - Review Modes may be open concurrently for multiple Problems, but only one may be highlighted as *currently interactive* on the Dashboard.
 
+### Auto-Close on New Pitch
+
+When a moderator opens a new pitch while another pitch is already open, the system **automatically closes the previous pitch** by creating a `closed_for_pitch_assessment` decision before recording the new `opened_for_pitch_assessment` decision. This enforces the at-most-one-pitch invariant without requiring manual close actions.
+
+The auto-generated close decision records:
+- `actor_user_id`: the moderator who opened the new pitch
+- `rationale`: `"Auto-closed: new pitch opened"`
+- `is_binding`: `true`
+
 ### Failure and Edge Cases
 - If a mode is left open unintentionally, Moderators can close it retroactively.
 - Late submissions after closure are rejected without error.
@@ -270,7 +279,7 @@ Moderators have additional pace control capabilities.
 **Quick Actions:**
 - "Extend by 5 minutes" — Add time to current countdown
 - "Close now" — Immediately close current phase
-- "Announce" — Push notification to all participants
+- "Announce" — Post an event-wide chat message visible to all participants (see Ch.31.16). The message is persisted in `chat_messages` with `problem_id = NULL, context_situation = 'event_announcement'`. Optionally triggers a brief banner/toast for connected participants
 
 **Event Agenda Management:**
 ```

@@ -85,7 +85,7 @@ The platform supports a **multi-location community** (Cologne, Aachen, with pote
 
 **Valuable lessons** refers to:
 1. Structured entries in the `lessons_learned` table flagged with `valuable = TRUE` (Chapter 4.2, Chapter 31)
-2. Chat messages flagged with `valuable_insight = TRUE` (Chapter 31.13)
+2. Chat messages flagged with `valuable_insight = TRUE` (Chapter 31.12)
 
 Both sources feed cross-location analytics when flagged by Problem Owners or moderators.
 
@@ -129,7 +129,25 @@ To prevent misuse or over-interpretation:
 - Decisions are never derived automatically from statistics.
 
 ### 15.3.4 Export and Downstream Use
-While not a core UI feature, the analytics layer is designed so that:
+
+Every analytics view and audit screen that displays tabular data includes a **"Download CSV"** button (admin-only). The export captures exactly what the current view shows, including all active filters.
+
+**Export-enabled views**:
+- Rating results (Ch.15.1) — per-inventory aggregates with N, Mean, SD, Min, Max
+- Decision history timeline (Ch.13.6.4) — full decision log for a problem
+- Global audit views (Ch.12.6) — cross-event decision histories, assessment usage, show-up rates
+- Contributor wall / points ledger (Ch.33.6) — points breakdown by user
+
+**Export behavior**:
+- CSV format with UTF-8 BOM for Excel compatibility
+- Filename convention: `{view_name}_{ISO_date}.csv` (e.g., `rating_results_2026-02-25.csv`)
+- Includes all columns visible in the current filtered view
+- No row limit — exports the full dataset matching the active filters
+- Triggered client-side from the rendered data; no separate server-side export endpoint required
+
+**Design rationale**: CSV export from existing views keeps the implementation minimal — no new API endpoints, no format negotiation, no pagination. It also doubles as a **debugging aid**: administrators can verify what the system displays matches expectations. For programmatic access, the future Agent REST API (Ch.22) will provide JSON endpoints that subsume this capability.
+
+The underlying analytics layer is designed so that:
 - All displayed aggregates can be reproduced via database queries.
 - External tools (e.g., statistical software) can consume the same data without semantic loss.
 

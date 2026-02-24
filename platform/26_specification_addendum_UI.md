@@ -1154,7 +1154,7 @@ All administrative interfaces work on smartphones with **375px width minimum (iP
 
 ### 26.12.3 Decision Button Accordion (Moderator Mobile)
 
-**Context**: Moderator Dashboard has 25 decision types across 7 categories.
+**Context**: Moderator Dashboard has 26 decision types across 8 categories.
 **Mobile Solution**: Accordion sections with color-coded headers (Decision #4).
 
 **Mobile Layout**:

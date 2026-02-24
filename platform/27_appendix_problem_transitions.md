@@ -46,13 +46,13 @@ Per `action_state_catalog` (Ch.19.2.2):
 
 ## 27.2 Decision Types and State Effects
 
-All state transitions are driven by decisions. The `decision_type_catalog` (Ch.19.2.3) defines 25 decision types across 8 categories. The `decision_state_effects` table (Ch.19.2.4) maps each decision type to its resulting state changes.
+All state transitions are driven by decisions. The `decision_type_catalog` (Ch.19.2.3) defines 26 decision types across 8 categories. The `decision_state_effects` table (Ch.19.2.4) maps each decision type to its resulting state changes.
 
 ### Decision Type Summary
 
 | Category | Decision Types | Affects Readiness | Affects Action |
 |----------|---------------|-------------------|----------------|
-| **Lifecycle** | `problem_created`, `problem_cloned`, `problem_submitted`, `problem_updated` | Yes | Some |
+| **Lifecycle** | `problem_created`, `problem_cloned`, `problem_submitted`, `problem_updated`, `problem_archived` | Yes | Some |
 | **Quality Gate** | `quality_gate_accepted`, `quality_gate_rejected`, `quality_gate_needs_changes` | Yes | No |
 | **Planning** | `selected_for_event`, `deselected_for_event` | No | Yes |
 | **Sprint** | `selected_for_coding`, `deselected_for_coding` | No | Yes |
@@ -274,6 +274,18 @@ Even after deferral, drop, or closure, a later binding decision may reactivate a
 - `current_action_state` → `selected_for_event`
 
 This demonstrates the system's core property: **decisions are append-only and any state can be superseded by a later binding decision**.
+
+### Archival
+
+At any point, a Problem Owner may archive a problem that is no longer relevant:
+
+**Decision**: `problem_archived` (binding, PO)
+
+**Resulting States**:
+- `archived_at` → set to decision timestamp on `problems` table
+- No change to readiness or action state
+
+Archiving is orthogonal to the dual-state model. It sets a soft-delete flag that removes the problem from default listings and dashboards while preserving all data and URLs. An archived problem can be reactivated by cloning it via `problem_cloned`.
 
 ---
 

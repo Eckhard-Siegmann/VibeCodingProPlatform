@@ -228,6 +228,8 @@ The private view exposes the following actions:
   Creates a new **major version**, copying all content and allowing edits.
 - **Clone Problem**
   Creates a new Problem, without linking history.
+- **Assign PO Deputy**
+  Opens a FormDialog (Ch.26.11.10) where the PO searches registered users by name or email and assigns one as deputy. Sets `deputy_owner_user_id` on the `problems` table (Ch.19.3.10). The deputy gains the same edit and management rights as the PO for this problem. Only one deputy per problem; assigning a new one replaces the previous.
 
 ### Resource Management
 Problem Owners can manage resource lists:

@@ -98,6 +98,7 @@ Implementation-specific decisions are documented as ADRs, separate from the beha
 | `adr/003_component_system_architecture.md` | shadcn-svelte pattern, bits-ui primitives, cn() utility, dependencies |
 | `adr/004_authentication_providers.md` | GitHub OAuth, LinkedIn OAuth, password hashing algorithm |
 | `adr/005_email_provider_brevo.md` | Brevo REST API for transactional email delivery |
+| `adr/006_decision_recording_architecture.md` | Single-transaction `recordDecision()` orchestrator, semantic decision groupings, lazy timer evaluation |
 
 ### Other
 
@@ -114,7 +115,6 @@ Implementation-specific decisions are documented as ADRs, separate from the beha
 - **Item**: Immutable evaluation primitive with question, scale, and labels
 - **Assessment**: Application of an inventory to a problem version
 - **Decision**: Explicit, timestamped action that changes state or records outcomes
-- **Comment**: Qualitative feedback stored separately from decisions
 
 ---
 
@@ -151,6 +151,18 @@ These dimensions enable **semantic comparison** of solutions produced by differe
 Problems have two orthogonal states:
 - **Readiness State**: Intrinsic quality (draft, submitted, needs_changes, ready, rejected)
 - **Action State**: Community intent (backlog, selected_for_event, selected_for_coding, deferred, dropped, closed)
+
+State transitions are driven exclusively by **Decisions** (never by votes, assessments, or implicit inference). The specification layers this across chapters:
+
+| Layer | Chapter | What it defines |
+|-------|---------|-----------------|
+| Concept | Ch.4 §4.3 | What readiness and action states mean |
+| Mechanism | Ch.10 §10.2-10.3 | How decisions drive transitions; binding vs. non-binding; 26 decision types |
+| Data model | Ch.19 §19.2.4 | **Authoritative** `decision_state_effects` mapping table |
+| Walkthrough | Ch.27 | Normative end-to-end transition sequences |
+| Diagrams | Ch.28 | Visual state diagrams (Mermaid) |
+
+**Note**: Live orchestration modes (`pitch`, `review`, `idle`) are NOT action states — they are transient contexts tracked in `event_live_context` (Ch.14).
 
 ---
 
@@ -233,7 +245,7 @@ Relational SQL database with append-only event sourcing (see ADR 001 for engine 
 |-------|---------|
 | `readiness_state_catalog` | 5 readiness states (draft, submitted, needs_changes, ready, rejected) |
 | `action_state_catalog` | 6 action states (backlog, selected_for_event, selected_for_coding, deferred, dropped, closed) |
-| `decision_type_catalog` | 25 decision types across 8 categories |
+| `decision_type_catalog` | 26 decision types across 8 categories |
 | `decision_state_effects` | Maps decisions to state changes |
 | `time_context_catalog` | Assessment time contexts (pre_event, pitch, review, post_event, late_reflection) |
 | `user_role_catalog` | 7 roles (observer, developer, coding_partner, problem_owner, moderator, admin, agent) |
@@ -253,7 +265,6 @@ Relational SQL database with append-only event sourcing (see ADR 001 for engine 
 | Table | Status | Notes |
 |-------|--------|-------|
 | `sessions` | **REMOVED** | All participation requires mandatory authentication (Ch.18, Ch.19.3.2) |
-| `comments` | **DEPRECATED** | Retained for historical data only; new feedback uses `chat_messages` (Ch.31, Ch.19.3.19) |
 
 ### Hybrid Item Reference Model
 
@@ -294,7 +305,7 @@ The platform supports **multiple locations** within a unified community:
 - Maintain separation between content, evaluation, and decision-making concepts
 - Use past tense for decision_type catalog entries
 - Preserve append-only semantics for historical data
-- **New qualitative feedback uses `chat_messages`**, not deprecated `comments` table
+- **Qualitative feedback uses `chat_messages`** (see Chapter 31)
 - Tooling documentation goes in PR descriptions, not in the database
 - Controlled vocabularies use **VARCHAR + FK reference tables** (not enums) for extensibility without migration
 
@@ -412,19 +423,6 @@ export async function hashData(data: string): Promise<string> {
 - Relax validation schemas for development (e.g., hash length)
 - Add try/catch around localStorage access (may be blocked in private browsing)
 - Test on actual mobile devices over network, not just browser dev tools mobile emulation
-
-### Team Chat Replaces Comments
-
-**Decision**: The `comments` table is **deprecated** (Ch.31, Ch.19.3.19). All new qualitative feedback flows through the `chat_messages` system (Ch.31).
-
-**Rationale**:
-- Chat provides richer context (problem, event, team, situation)
-- Real-time updates during events
-- Threading, @mentions, and emoji reactions
-- Better discoverability via filters
-- Supports team formation and collaboration
-
-**Migration**: Historical comments remain in the database for audit. New features should use chat exclusively.
 
 ### Contributor Recognition: Points vs Stars
 
@@ -618,7 +616,8 @@ import { cn } from '$lib/utils';
 1. **Find relevant spec chapters:**
    - UI behavior → Ch.12-14, Ch.26
    - Data model → Ch.19
-   - Problem states → Ch.5, Ch.27
+   - Problem states & transitions → Ch.4, Ch.10, Ch.19 §19.2.4, Ch.27
+   - Problem versioning → Ch.5
    - Assessments → Ch.8-9
    - Authentication → Ch.18
 

@@ -184,7 +184,7 @@ CREATE TABLE emoji_catalog (
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1))
 );
 
--- 19.3.32 contribution_action_catalog
+-- 19.3.34 contribution_action_catalog
 -- Point action types with configurable weights (Ch.33)
 CREATE TABLE contribution_action_catalog (
   action_key TEXT PRIMARY KEY,
@@ -196,7 +196,7 @@ CREATE TABLE contribution_action_catalog (
   created_at TEXT NOT NULL
 );
 
--- 19.3.35 review_weight_catalog
+-- 19.3.37 review_weight_catalog
 -- Review weightings for star award calculations (Ch.33)
 CREATE TABLE review_weight_catalog (
   weight_key TEXT PRIMARY KEY,
@@ -263,10 +263,23 @@ CREATE TABLE users (
   last_login_at TEXT
 );
 
--- 19.3.2 sessions table REMOVED
--- All participation requires authentication (mandatory user_id)
+-- 19.3.2 user_sessions
+-- Authenticated session management (ADR 007)
+-- Raw session token sent as HTTP-only cookie; only SHA-256 hash stored server-side
+CREATE TABLE user_sessions (
+  session_id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(user_id),
+  token_hash TEXT NOT NULL UNIQUE,  -- SHA-256 hash of raw session token
+  expires_at TEXT,  -- NULL = browser session; set = "remember me" (30 days)
+  created_at TEXT NOT NULL,  -- Used for max lifetime check (90 days)
+  last_seen_at TEXT NOT NULL,  -- Updated on each validated request
+  user_agent TEXT  -- For "manage sessions" UI (identify devices)
+);
 
--- 19.3.39 api_keys
+CREATE INDEX idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
+
+-- 19.3.41 api_keys
 -- API keys for bot authentication (created and revoked by human users)
 -- Temporal validity follows waitlist_expires_at pattern from event_registrations
 -- Note: users.api_key_id references this table; circular dependency resolved by
@@ -337,6 +350,8 @@ CREATE TABLE events (
   x_post_url TEXT,
   image_url TEXT,
   overbooking_factor REAL NOT NULL DEFAULT 1.30,
+  reminder_due INTEGER NOT NULL DEFAULT 0 CHECK(reminder_due IN (0,1)),  -- ADR 010: set by cron tick when starts_at - 24h reached
+  reminder_sent_at TEXT,  -- When moderator-initiated broadcast was dispatched
   created_at TEXT NOT NULL
 );
 
@@ -366,7 +381,37 @@ CREATE TABLE event_attendance (
   UNIQUE(event_id, user_id)
 );
 
--- 19.3.9 problems
+-- 19.3.9 event_email_templates
+-- Versioned email templates per event (Ch.16.6, Ch.19.3.9)
+CREATE TABLE event_email_templates (
+  template_id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(event_id),
+  version INTEGER NOT NULL CHECK(version >= 1),
+  subject TEXT NOT NULL,
+  body_markdown TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  created_by_user_id TEXT NOT NULL REFERENCES users(user_id),
+  is_current INTEGER NOT NULL CHECK(is_current IN (0,1)),
+  UNIQUE(event_id, version)
+);
+
+-- 19.3.10 communications_log
+-- Immutable audit trail of outbound communications and automated actions (ADR 010, M17b)
+CREATE TABLE communications_log (
+  log_id TEXT PRIMARY KEY,
+  event_id TEXT NOT NULL REFERENCES events(event_id),
+  type TEXT NOT NULL,  -- broadcast_manual, waitlist_invite, waitlist_expired, reminder_manual
+  recipient_user_id TEXT REFERENCES users(user_id),  -- NULL for broadcast-to-all
+  recipient_count INTEGER,  -- Number of recipients for broadcast-type entries
+  subject TEXT,
+  body_preview TEXT,  -- First 500 chars of rendered body for audit display
+  template_version INTEGER,  -- Which event_email_templates.version was used
+  triggered_by TEXT NOT NULL CHECK(triggered_by IN ('system', 'moderator')),
+  triggered_by_user_id TEXT REFERENCES users(user_id),  -- NULL for system actions
+  created_at TEXT NOT NULL
+);
+
+-- 19.3.12 problems (was 19.3.9 before email/comms tables added)
 -- Problem identity across all versions + cached state
 CREATE TABLE problems (
   problem_id TEXT PRIMARY KEY,
@@ -382,7 +427,7 @@ CREATE TABLE problems (
   current_action_state TEXT NOT NULL DEFAULT 'backlog' REFERENCES action_state_catalog(state_key)
 );
 
--- 19.3.10 problem_versions
+-- 19.3.13 problem_versions
 -- Major versions of Problem Cards
 CREATE TABLE problem_versions (
   problem_version_id TEXT PRIMARY KEY,
@@ -405,7 +450,7 @@ CREATE TABLE problem_versions (
 CREATE UNIQUE INDEX idx_one_current_version
 ON problem_versions(problem_id) WHERE is_current = 1;
 
--- 19.3.11 problem_repo_snapshots
+-- 19.3.14 problem_repo_snapshots
 -- GitHub commit hashes mapped to minor versions
 CREATE TABLE problem_repo_snapshots (
   snapshot_id TEXT PRIMARY KEY,
@@ -418,7 +463,7 @@ CREATE TABLE problem_repo_snapshots (
   UNIQUE(problem_id, major_version, minor_version)
 );
 
--- 19.3.12 problem_resources
+-- 19.3.24 problem_resources
 -- URLs and resources associated with problems
 CREATE TABLE problem_resources (
   resource_id TEXT PRIMARY KEY,
@@ -432,7 +477,7 @@ CREATE TABLE problem_resources (
   created_at TEXT NOT NULL
 );
 
--- 19.3.13 event_live_context
+-- 19.3.11 event_live_context
 -- Caches the current live orchestration state for an event
 -- Extended with timer fields per Ch.14.5
 CREATE TABLE event_live_context (
@@ -445,11 +490,11 @@ CREATE TABLE event_live_context (
   updated_at TEXT NOT NULL
 );
 
--- 19.3.14 inventories
+-- 19.3.15 inventories
 -- Reusable evaluation instruments
 CREATE TABLE inventories (
   inventory_id TEXT PRIMARY KEY,
-  inventory_key TEXT UNIQUE NOT NULL,
+  inventory_key TEXT NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0,1)),
@@ -457,7 +502,11 @@ CREATE TABLE inventories (
   retired_at TEXT
 );
 
--- 19.3.15 items
+-- Enforce: at most one active inventory per inventory_key (mirrors items pattern)
+CREATE UNIQUE INDEX idx_one_active_inventory_per_key
+ON inventories(inventory_key) WHERE retired_at IS NULL;
+
+-- 19.3.16 items
 -- Immutable evaluation items
 CREATE TABLE items (
   item_id TEXT PRIMARY KEY,
@@ -470,6 +519,8 @@ CREATE TABLE items (
   label_mid TEXT,
   label_high_mid TEXT,
   label_max TEXT,
+  category TEXT,           -- Administrative grouping (Ch.17.1)
+  internal_notes TEXT,     -- Optional admin notes about usage/interpretation (Ch.17.1)
   created_at TEXT NOT NULL,
   retired_at TEXT
 );
@@ -478,7 +529,7 @@ CREATE TABLE items (
 CREATE UNIQUE INDEX idx_one_active_item_per_key
 ON items(item_key) WHERE retired_at IS NULL;
 
--- 19.3.16 inventory_items
+-- 19.3.17 inventory_items
 -- Composition and order of inventory
 CREATE TABLE inventory_items (
   inventory_id TEXT NOT NULL REFERENCES inventories(inventory_id),
@@ -488,7 +539,7 @@ CREATE TABLE inventory_items (
   UNIQUE(inventory_id, position_index)
 );
 
--- 19.3.17 assessments
+-- 19.3.18 assessments
 -- Application of inventory to problem
 CREATE TABLE assessments (
   assessment_id TEXT PRIMARY KEY,
@@ -501,7 +552,7 @@ CREATE TABLE assessments (
   closed_at TEXT
 );
 
--- 19.3.18 responses
+-- 19.3.19 responses
 -- Atomic answers to items with contextual metadata
 -- All responses require authentication (user_id NOT NULL)
 -- Extended with review_weight_key per Ch.33
@@ -520,7 +571,7 @@ CREATE TABLE responses (
   superseded_by_response_id TEXT REFERENCES responses(response_id)
 );
 
--- 19.3.19 decisions
+-- 19.3.20 decisions
 -- Canonical event log for all decisions and state transitions
 CREATE TABLE decisions (
   decision_id TEXT PRIMARY KEY,
@@ -536,7 +587,7 @@ CREATE TABLE decisions (
   created_at TEXT NOT NULL
 );
 
--- 19.3.19 event_problem_queue
+-- 19.3.21 event_problem_queue
 -- Problem-event associations for backlog management
 CREATE TABLE event_problem_queue (
   queue_id TEXT PRIMARY KEY,
@@ -583,7 +634,7 @@ CREATE TABLE problem_team_members (
 -- LESSONS LEARNED TABLE
 --------------------------------------------------------------------------------
 
--- 19.3.24 lessons_learned
+-- 19.3.29 lessons_learned
 -- Structured capture of insights per problem
 CREATE TABLE lessons_learned (
   lesson_id TEXT PRIMARY KEY,
@@ -651,7 +702,7 @@ CREATE TABLE chat_reactions (
 -- CONTRIBUTOR RECOGNITION TABLES (Ch.33)
 --------------------------------------------------------------------------------
 
--- 19.3.33 contribution_points
+-- 19.3.35 contribution_points
 -- Append-only ledger of points awarded to users
 CREATE TABLE contribution_points (
   contribution_id TEXT PRIMARY KEY,
@@ -665,7 +716,7 @@ CREATE TABLE contribution_points (
   UNIQUE(user_id, action_key, source_type, source_id)  -- Prevent double-awarding
 );
 
--- 19.3.34 star_awards
+-- 19.3.36 star_awards
 -- Hacking excellence awards (1st, 2nd, 3rd place)
 CREATE TABLE star_awards (
   award_id TEXT PRIMARY KEY,
@@ -684,7 +735,7 @@ CREATE TABLE star_awards (
 -- ONBOARDING AND ENGAGEMENT TABLES (Ch.32, Ch.33)
 --------------------------------------------------------------------------------
 
--- 19.3.37 user_milestones
+-- 19.3.39 user_milestones
 -- Tracks first-time achievements for celebration moments
 CREATE TABLE user_milestones (
   milestone_id TEXT PRIMARY KEY,
@@ -696,7 +747,7 @@ CREATE TABLE user_milestones (
   UNIQUE(user_id, milestone_key)  -- Each milestone achieved once per user
 );
 
--- 19.3.38 user_hint_dismissals
+-- 19.3.40 user_hint_dismissals
 -- Tracks dismissed onboarding hints
 CREATE TABLE user_hint_dismissals (
   user_id TEXT NOT NULL REFERENCES users(user_id),
@@ -771,9 +822,36 @@ CREATE INDEX idx_milestones_by_user ON user_milestones(user_id);
 -- User Hints (Ch.32)
 CREATE INDEX idx_hints_by_user ON user_hint_dismissals(user_id);
 
--- API Keys (Ch.18.13, Ch.19.3.39)
+-- API Keys (Ch.18.13, Ch.19.3.42)
 CREATE INDEX idx_api_keys_by_owner ON api_keys(owner_user_id);
 CREATE INDEX idx_api_keys_active ON api_keys(key_hash)
 WHERE revoked_at IS NULL;
 CREATE INDEX idx_users_by_api_key ON users(api_key_id)
 WHERE api_key_id IS NOT NULL;
+
+-- =============================================================================
+-- VIEWS
+-- =============================================================================
+
+-- 19.3.38 contributor_wall_6week — Ch.33.6.2
+-- Aggregation view for the public contributor wall: top-10 contributors
+-- over a rolling 6-week window, filtered by privacy opt-in.
+-- Note: This is the SQLite version. Production PostgreSQL uses INTERVAL '6 weeks'.
+CREATE VIEW IF NOT EXISTS contributor_wall_6week AS
+SELECT
+  u.user_id,
+  u.display_name,
+  COALESCE(SUM(cp.points_awarded), 0) AS total_points,
+  COALESCE(SUM(sa.stars_awarded), 0) AS total_stars,
+  COUNT(DISTINCT cp.contribution_id) AS contribution_count
+FROM users u
+LEFT JOIN contribution_points cp ON u.user_id = cp.user_id
+  AND cp.awarded_at >= datetime('now', '-42 days')
+LEFT JOIN star_awards sa ON u.user_id = sa.user_id
+  AND sa.awarded_at >= datetime('now', '-42 days')
+WHERE u.show_on_contributor_wall = 1
+  AND u.role != 'agent'
+GROUP BY u.user_id, u.display_name
+HAVING total_points > 0 OR total_stars > 0
+ORDER BY total_points DESC, contribution_count DESC
+LIMIT 10;

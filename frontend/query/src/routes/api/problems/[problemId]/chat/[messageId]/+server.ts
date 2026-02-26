@@ -40,7 +40,7 @@ export const PATCH: RequestHandler = async ({ params, request }) => {
 		body = EditMessageSchema.parse(rawBody);
 	} catch (err) {
 		if (err instanceof z.ZodError) {
-			throw error(400, `Validation error: ${err.errors.map(e => e.message).join(', ')}`);
+			throw error(400, `Validation error: ${err.issues.map((e: z.ZodIssue) => e.message).join(', ')}`);
 		}
 		throw error(400, 'Invalid request body');
 	}

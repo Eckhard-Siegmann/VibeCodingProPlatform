@@ -1,7 +1,7 @@
 <script lang="ts">
 	import PageContainer from '$lib/components/layout/PageContainer.svelte';
-	import { Card, CardHeader, CardTitle } from '$lib/components/ui/card';
-	import { Badge } from '$lib/components/ui/badge';
+	import { Card } from '$lib/components/ui/card';
+	import { Badge, type BadgeVariant } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import BackButton from '$lib/components/ui/back-button/back-button.svelte';
 	import { EventHeader, type EventHeaderData } from '$lib/components/events';
@@ -9,127 +9,221 @@
 	import { toastSuccess, toastError } from '$lib/stores/toast';
 	import { FileText, ArrowRight } from '@lucide/svelte';
 
-	interface Props {
-		data: { slug: string };
-	}
+	let { data } = $props();
 
-	let { data }: Props = $props();
-
-	// Derive slug from data
-	const eventSlug = $derived(data.slug ?? 'cologne-march-2026');
-
-	// Demo event data - in production this would come from +page.server.ts
-	const eventData: EventHeaderData = $derived({
-		id: 'evt-1',
-		slug: eventSlug,
-		title: 'VibeCoding Professionals - Cologne March 2026',
-		description: `Join us for another exciting VibeCoding event!
-
-This month we'll explore AI-assisted development with real coding challenges from the community. Whether you're a seasoned developer or just curious about AI tools, there's something for everyone.
-
-**Agenda:**
-- 18:00 - Welcome & Introductions
-- 18:15 - Problem Pitches (3-4 problems presented)
-- 18:45 - Voting & Problem Selection
-- 19:00 - Coding Sprint (90 minutes)
-- 20:30 - Solution Reviews & Ratings
-- 21:00 - Lessons Learned & Wrap-up
-
-**What to bring:**
-- Laptop with your favorite IDE
-- Curiosity and willingness to experiment
-- Optionally: A problem you'd like to submit`,
-		startsAt: '2026-03-15T18:00:00',
-		plannedEndsAt: '2026-03-15T21:00:00',
+	// Map server data to EventHeader component interface
+	const eventHeaderData: EventHeaderData = $derived({
+		id: data.event.event_id,
+		slug: data.event.slug,
+		title: data.event.title,
+		description: data.event.description ?? undefined,
+		startsAt: data.event.starts_at,
+		plannedEndsAt: data.event.planned_ends_at,
+		imageUrl: data.event.image_url ?? undefined,
 		location: {
-			name: 'STARTPLATZ Koeln',
-			city: 'Cologne',
-			address: 'Im Mediapark 5'
+			name: data.event.location.name,
+			city: data.event.location.city,
+			address: data.event.location.address
 		},
 		room: {
-			name: 'Workshop Room A'
+			name: data.event.room.name
 		},
 		partner: {
-			name: 'STARTPLATZ',
-			logoUrl: undefined
+			name: data.event.partner.name,
+			logoUrl: data.event.partner.logo_url ?? undefined
 		},
-		host: {
-			id: 'user-host',
-			displayName: 'Michael Moderator'
-		},
-		coHost1: {
-			id: 'user-cohost',
-			displayName: 'Sandra Support'
-		},
-		websiteUrl: 'https://www.startplatz.de',
-		linkedinUrl: 'https://linkedin.com/events/123',
-		isPast: false,
-		isLive: false
+		host: data.event.host,
+		coHost1: data.event.coHost1,
+		coHost2: data.event.coHost2,
+		websiteUrl: data.event.website_url,
+		linkedinUrl: data.event.linkedin_url,
+		xPostUrl: data.event.x_post_url,
+		isPast: data.event.isPast,
+		isLive: data.event.isLive
 	});
 
-	// Event data for registration section
-	let registrationEvent: EventData = $derived({
-		id: eventData.id,
-		title: eventData.title,
-		capacity: 30,
-		registeredCount: 18,
-		waitlistCount: 0
-	});
-
-	// Demo user registration state - null means not registered
+	// Registration section data — mutable for optimistic updates after API calls.
+	// Initialized from server data; synced on navigation via $effect.
+	let registeredCount = $state(0);
+	let waitlistCount = $state(0);
 	let userRegistration = $state<UserRegistration | null>(null);
-	let isAuthenticated = $state(true); // For demo purposes
 
-	// Demo problems selected for this event
-	const eventProblems = [
-		{
-			id: 'prob-1',
-			slug: '11',
-			title: 'RAG Retrieval Quality Evaluation',
-			ownerName: 'Max Mustermann',
-			readinessState: 'ready' as const,
-			actionState: 'selected_for_event' as const
-		},
-		{
-			id: 'prob-2',
-			slug: '22',
-			title: 'Code Evaluation Agent',
-			ownerName: 'Eva Schmidt',
-			readinessState: 'ready' as const,
-			actionState: 'selected_for_event' as const
-		},
-		{
-			id: 'prob-3',
-			slug: '33',
-			title: 'DSPy Skill Optimization',
-			ownerName: 'Lisa Chen',
-			readinessState: 'ready' as const,
-			actionState: 'selected_for_event' as const
+	$effect(() => {
+		registeredCount = data.counts.registeredCount;
+		waitlistCount = data.counts.waitlistCount;
+		userRegistration = mapRegistration(data.registration);
+	});
+
+	// Per Ch.29.5: Display uses base capacity (not overbooking) to hide overbooking
+	const displayCapacity = $derived(data.counts.baseCapacity);
+
+	const registrationEvent: EventData = $derived({
+		id: data.event.event_id,
+		title: data.event.title,
+		capacity: displayCapacity,
+		registeredCount,
+		waitlistCount
+	});
+
+	function mapRegistration(reg: typeof data.registration): UserRegistration | null {
+		if (!reg) return null;
+
+		let waitlistStatus: 'waitlisted' | 'invited' | null = null;
+		if (reg.waitlist_invited_at) {
+			waitlistStatus = 'invited';
+		} else if (reg.waitlist_position !== null) {
+			waitlistStatus = 'waitlisted';
 		}
-	];
 
-	function handleRegister(data: { attendanceMode: 'in_presence' | 'remote'; newsletter: boolean }) {
-		// Simulate registration
-		userRegistration = {
-			id: 'reg-' + Date.now(),
-			attendanceMode: data.attendanceMode,
-			waitlistStatus: registrationEvent.registeredCount >= registrationEvent.capacity ? 'waitlisted' : null,
-			waitlistPosition: registrationEvent.registeredCount >= registrationEvent.capacity ? 3 : undefined
+		return {
+			id: reg.registration_id,
+			attendanceMode: reg.in_presence ? 'in_presence' : 'remote',
+			waitlistStatus,
+			waitlistPosition: reg.waitlist_position ?? undefined,
+			waitlistExpiresAt: reg.waitlist_expires_at
 		};
-		toastSuccess(
-			'Registration successful!',
-			userRegistration.waitlistStatus ? "You're on the waitlist" : "You're confirmed for the event"
-		);
 	}
 
-	function handleUnregister() {
-		userRegistration = null;
-		toastSuccess('Registration cancelled', 'You have been unregistered from the event');
+	let loading = $state(false);
+
+	async function handleRegister(regData: { attendanceMode: 'in_presence' | 'remote'; newsletter: boolean }) {
+		if (loading) return;
+
+		if (!data.isAuthenticated) {
+			window.location.href = `/login?redirect=/event/${data.event.slug}`;
+			return;
+		}
+
+		loading = true;
+		try {
+			const res = await fetch(`/api/events/${data.event.event_id}/registrations`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					action: 'register',
+					in_presence: regData.attendanceMode === 'in_presence'
+				})
+			});
+
+			const result = await res.json();
+
+			if (!res.ok || !result.success) {
+				toastError('Registration failed', result.error ?? 'Please try again');
+				return;
+			}
+
+			// Update local state from server response
+			if (result.counts) {
+				registeredCount = result.counts.registeredCount;
+				waitlistCount = result.counts.waitlistCount;
+			}
+			userRegistration = mapRegistration(result.registration);
+
+			if (result.waitlisted) {
+				toastSuccess("You're on the waitlist", `Position #${result.waitlist_position}`);
+			} else {
+				toastSuccess('Registration successful!', "You're confirmed for the event");
+			}
+		} catch {
+			toastError('Registration failed', 'Network error — please try again');
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleUnregister() {
+		if (loading) return;
+		loading = true;
+		try {
+			const res = await fetch(`/api/events/${data.event.event_id}/registrations`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'cancel' })
+			});
+
+			const result = await res.json();
+
+			if (!res.ok || !result.success) {
+				toastError('Cancellation failed', result.error ?? 'Please try again');
+				return;
+			}
+
+			if (result.counts) {
+				registeredCount = result.counts.registeredCount;
+				waitlistCount = result.counts.waitlistCount;
+			}
+			userRegistration = null;
+			toastSuccess('Registration cancelled', 'You have been unregistered from the event');
+		} catch {
+			toastError('Cancellation failed', 'Network error — please try again');
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleConfirmWaitlist() {
+		if (loading) return;
+		loading = true;
+		try {
+			const res = await fetch(`/api/events/${data.event.event_id}/registrations`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'waitlist-respond', accept: true })
+			});
+
+			const result = await res.json();
+
+			if (!res.ok || !result.success) {
+				toastError('Confirmation failed', result.error ?? 'Please try again');
+				return;
+			}
+
+			if (result.counts) {
+				registeredCount = result.counts.registeredCount;
+				waitlistCount = result.counts.waitlistCount;
+			}
+			userRegistration = mapRegistration(result.registration);
+			toastSuccess('Spot confirmed!', "You're registered for the event");
+		} catch {
+			toastError('Confirmation failed', 'Network error — please try again');
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleDeclineWaitlist() {
+		if (loading) return;
+		loading = true;
+		try {
+			const res = await fetch(`/api/events/${data.event.event_id}/registrations`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ action: 'waitlist-respond', accept: false })
+			});
+
+			const result = await res.json();
+
+			if (!res.ok || !result.success) {
+				toastError('Failed to decline', result.error ?? 'Please try again');
+				return;
+			}
+
+			if (result.counts) {
+				registeredCount = result.counts.registeredCount;
+				waitlistCount = result.counts.waitlistCount;
+			}
+			userRegistration = null;
+			toastSuccess('Invitation declined', 'The next person on the waitlist has been notified');
+		} catch {
+			toastError('Failed to decline', 'Network error — please try again');
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
 <svelte:head>
-	<title>{eventData.title} - VibeCoding</title>
+	<title>{data.event.title} - VibeCoding</title>
 </svelte:head>
 
 <PageContainer>
@@ -139,16 +233,16 @@ This month we'll explore AI-assisted development with real coding challenges fro
 	<div class="grid gap-8 lg:grid-cols-[1fr_360px]">
 		<!-- Main Content -->
 		<div class="space-y-8">
-			<EventHeader event={eventData} />
+			<EventHeader event={eventHeaderData} />
 
 			<!-- Problems Section -->
-			{#if eventProblems.length > 0}
+			{#if data.problems.length > 0}
 				<section>
 					<h2 class="text-xl font-semibold text-headers mb-4">
-						Problems for This Event ({eventProblems.length})
+						Problems for This Event ({data.problems.length})
 					</h2>
 					<div class="space-y-3">
-						{#each eventProblems as problem (problem.id)}
+						{#each data.problems as problem (problem.problem_id)}
 							<Card elevation="resting" padding="md">
 								<div class="flex items-start gap-4">
 									<div class="p-2 rounded-lg bg-primary/10 flex-shrink-0">
@@ -158,16 +252,16 @@ This month we'll explore AI-assisted development with real coding challenges fro
 										<div class="flex items-start justify-between gap-2">
 											<div class="min-w-0">
 												<h3 class="font-semibold text-headers truncate">{problem.title}</h3>
-												<p class="text-sm text-labels">by {problem.ownerName}</p>
+												<p class="text-sm text-labels">by {problem.owner_name}</p>
 											</div>
 											<div class="flex gap-2 flex-shrink-0">
-												<Badge variant={problem.readinessState}>
-													{problem.readinessState.replace('_', ' ')}
+												<Badge variant={problem.readiness_state as BadgeVariant}>
+													{problem.readiness_state.replace('_', ' ')}
 												</Badge>
 											</div>
 										</div>
 									</div>
-									<a href={`/problem/${problem.slug}`} class="flex-shrink-0">
+									<a href={`/problem/${problem.public_slug}`} class="flex-shrink-0">
 										<Button variant="ghost" size="sm">
 											View
 											<ArrowRight class="w-4 h-4 ml-1" />
@@ -178,18 +272,47 @@ This month we'll explore AI-assisted development with real coding challenges fro
 						{/each}
 					</div>
 				</section>
+			{:else}
+				<section>
+					<h2 class="text-xl font-semibold text-headers mb-4">
+						Problems for This Event
+					</h2>
+					<Card elevation="flat" padding="lg">
+						<p class="text-center text-labels">
+							{#if data.event.isPast}
+								No problems were selected for this event.
+							{:else}
+								No problems selected yet. Check back as the event approaches.
+							{/if}
+						</p>
+					</Card>
+				</section>
 			{/if}
 		</div>
 
 		<!-- Sidebar - Registration -->
-		<aside class="lg:sticky lg:top-4 lg:self-start">
-			<RegistrationSection
-				event={registrationEvent}
-				{userRegistration}
-				{isAuthenticated}
-				onRegister={handleRegister}
-				onUnregister={handleUnregister}
-			/>
-		</aside>
+		{#if !data.event.isPast}
+			<aside class="lg:sticky lg:top-4 lg:self-start">
+				<RegistrationSection
+					event={registrationEvent}
+					{userRegistration}
+					isAuthenticated={data.isAuthenticated}
+					onRegister={handleRegister}
+					onUnregister={handleUnregister}
+					onConfirmWaitlist={handleConfirmWaitlist}
+					onDeclineWaitlist={handleDeclineWaitlist}
+				/>
+			</aside>
+		{:else}
+			<aside>
+				<Card elevation="resting" padding="lg">
+					<h3 class="text-lg font-semibold text-headers mb-3">Event Summary</h3>
+					<div class="space-y-2 text-sm text-labels">
+						<p>{registeredCount} participants registered</p>
+						<p>{data.problems.length} problems tackled</p>
+					</div>
+				</Card>
+			</aside>
+		{/if}
 	</div>
 </PageContainer>

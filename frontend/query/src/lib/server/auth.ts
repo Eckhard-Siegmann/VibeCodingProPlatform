@@ -1,8 +1,18 @@
-// MVP: Hardcoded authenticated user
-// TODO: Replace with real session-based authentication
+/**
+ * Authentication utilities — session-based identity and role checks.
+ * Spec: Ch. 18 | ADR 007 (sessions)
+ *
+ * getAuthenticatedUser() now validates against real database sessions.
+ * Falls back to demo user when no session cookie is present (development mode).
+ *
+ * getApiKeyUser() validates Bearer tokens for agent (bot) authentication (Ch.18.8.2).
+ */
 
+import type { Cookies } from '@sveltejs/kit';
 import { getDatabase } from './db';
 import { getEffectiveRole } from './repositories/teams';
+import { validateSession, type SessionUser } from './session';
+import { validateBearerToken } from './repositories/api-keys';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -28,24 +38,43 @@ export class AuthError extends Error {
 
 // ── Identity ────────────────────────────────────────────────────────
 
-// User identity only - NO role attribute!
-// Role is contextual: determined by relationship to the resource being accessed
-export function getAuthenticatedUser(cookies?: any): AuthenticatedUser {
+/**
+ * Get authenticated user from session cookie.
+ * Falls back to demo user if no session exists (development convenience).
+ * Role is NOT included — role is contextual per Ch. 18.7.
+ */
+export function getAuthenticatedUser(cookies?: Cookies): AuthenticatedUser {
+	if (cookies) {
+		const session = validateSession(cookies);
+		if (session) {
+			return {
+				user_id: session.user_id,
+				email: session.email,
+				display_name: session.display_name
+			};
+		}
+	}
+
+	// Fallback: demo user for development (no session cookie)
 	return {
 		user_id: 'demo-user-001',
 		email: 'max.mustermann@startplatz.de',
 		display_name: 'Max Mustermann'
-		// NOTE: No role here! Role depends on context:
-		// - Accessing own problem → role = 'problem_owner'
-		// - Submitting assessment → role selected in form (developer/observer/problem_owner)
-		// - Moderator actions → checked via users.role in DB
 	};
+}
+
+/**
+ * Get session user with full auth fields (including email_confirmed, role).
+ * Returns null if not authenticated via session.
+ */
+export function getSessionUser(cookies: Cookies): SessionUser | null {
+	return validateSession(cookies);
 }
 
 /**
  * Require valid authentication. Throws AuthError(401) if not authenticated.
  */
-export function requireAuthenticated(cookies?: any): AuthenticatedUser {
+export function requireAuthenticated(cookies?: Cookies): AuthenticatedUser {
 	const user = getAuthenticatedUser(cookies);
 	if (!user) throw new AuthError('Unauthorized', 401);
 	return user;
@@ -59,7 +88,7 @@ export function requireAuthenticated(cookies?: any): AuthenticatedUser {
  * Throws AuthError(403) if user lacks required role.
  */
 export function requireRole(
-	cookies: any,
+	cookies: Cookies,
 	requiredRoles: string[]
 ): AuthenticatedUser {
 	const user = requireAuthenticated(cookies);
@@ -82,8 +111,8 @@ export function requireRole(
  * Require moderator or admin role.
  * Convenience wrapper around requireRole().
  */
-export function requireModerator(cookies?: any): AuthenticatedUser {
-	return requireRole(cookies, ['moderator', 'admin']);
+export function requireModerator(cookies?: Cookies): AuthenticatedUser {
+	return requireRole(cookies!, ['moderator', 'admin']);
 }
 
 /**
@@ -94,7 +123,7 @@ export function requireModerator(cookies?: any): AuthenticatedUser {
  * Throws AuthError(403) if the objectivity constraint is violated.
  */
 export function requireModeratorForProblem(
-	cookies: any,
+	cookies: Cookies,
 	problemId: string
 ): AuthenticatedUser {
 	const user = requireModerator(cookies);
@@ -107,6 +136,30 @@ export function requireModeratorForProblem(
 		);
 	}
 	return user;
+}
+
+// ── Agent / Bearer token auth ────────────────────────────────────────
+
+/**
+ * Authenticate an agent via Bearer token in the Authorization header.
+ * Returns the bot user's AuthenticatedUser if the token is valid and active.
+ * Returns null if header is absent or token is invalid/revoked/expired.
+ *
+ * Spec: Ch.18.8.2 (Bearer Token Validation Flow), Ch.19.3.42
+ */
+export function getApiKeyUser(request: Request): AuthenticatedUser | null {
+	const authHeader = request.headers.get('authorization');
+	if (!authHeader?.startsWith('Bearer ')) return null;
+
+	const rawToken = authHeader.slice('Bearer '.length);
+	const result = validateBearerToken(rawToken);
+	if (!result) return null;
+
+	return {
+		user_id: result.bot_user_id,
+		email: '', // agents have no email (Ch.18.8.3)
+		display_name: result.display_name
+	};
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -122,7 +175,6 @@ export function handleAuthError(error: any): { body: object; status: number } {
 			status: error.status
 		};
 	}
-	// Legacy string-based error matching (for backwards compat during migration)
 	if (error.message === 'Unauthorized') {
 		return { body: { success: false, error: 'Unauthorized' }, status: 401 };
 	}
@@ -137,10 +189,26 @@ export function isProblemOwner(userId: string, problemCreatedByUserId: string): 
 	return userId === problemCreatedByUserId;
 }
 
-// Check if user can access private view for a problem
-// In MVP: all demo problems accessible for testing
-export function canAccessPrivateView(problemCreatedByUserId: string): boolean {
-	const user = getAuthenticatedUser();
-	// MVP: Allow access to all demo problems for testing
-	return true; // TODO: return isProblemOwner(user.user_id, problemCreatedByUserId);
+// Check if user is the Deputy Problem Owner
+export function isDeputyOwner(userId: string, deputyOwnerUserId: string | null): boolean {
+	return deputyOwnerUserId !== null && userId === deputyOwnerUserId;
+}
+
+// Check if user has elevated rights (PO or Deputy) on a problem
+export function hasElevatedRights(
+	userId: string,
+	problemCreatedByUserId: string,
+	deputyOwnerUserId: string | null
+): boolean {
+	return isProblemOwner(userId, problemCreatedByUserId) || isDeputyOwner(userId, deputyOwnerUserId);
+}
+
+// Check if user can access private view for a problem (PO or Deputy)
+export function canAccessPrivateView(
+	cookies: Cookies,
+	problemCreatedByUserId: string,
+	deputyOwnerUserId: string | null = null
+): boolean {
+	const user = getAuthenticatedUser(cookies);
+	return hasElevatedRights(user.user_id, problemCreatedByUserId, deputyOwnerUserId);
 }

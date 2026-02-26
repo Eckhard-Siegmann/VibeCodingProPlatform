@@ -1,5 +1,5 @@
 <script lang="ts">
-	type Role = 'problem_owner' | 'developer' | 'observer';
+	import type { Role } from '$lib/utils/validators';
 
 	interface Props {
 		value: Role | null;

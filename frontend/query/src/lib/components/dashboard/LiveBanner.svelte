@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
-	import { Radio, Clock, ArrowRight, Users, Mic, CheckSquare } from '@lucide/svelte';
+	import { audioStore } from '$lib/stores/audio';
+	import { Radio, Clock, ArrowRight, Users, Mic, CheckSquare, Volume2, VolumeX } from '@lucide/svelte';
 
 	export type EventPhase = 'pre_event' | 'pitching' | 'voting' | 'coding' | 'review' | 'wrap_up';
 
@@ -80,7 +81,7 @@
 		}
 	};
 
-	const config = $derived(phaseConfig[event.currentPhase]);
+	const config = $derived(phaseConfig[event.currentPhase] ?? phaseConfig.pre_event);
 
 	// Format countdown timer
 	const formattedCountdown = $derived.by(() => {
@@ -94,11 +95,18 @@
 	const showRatingButton = $derived(
 		event.currentPhase === 'pitching' || event.currentPhase === 'review'
 	);
+
+	// Audio cue toggle state (Ch.14.5.1, U37, M28)
+	let audioEnabled = $derived($audioStore.enabled);
+
+	function toggleAudio() {
+		audioStore.setEnabled(!audioEnabled);
+	}
 </script>
 
 <div
 	class={cn(
-		'sticky top-0 z-40 border-b',
+		'sticky top-[var(--height-topbar-mobile)] md:top-[var(--height-topbar-desktop)] z-40 border-b',
 		config.bgColor,
 		config.borderColor,
 		className
@@ -134,7 +142,7 @@ t			{/if}
 				</div>
 			</div>
 
-			<!-- Timer & Stats -->
+			<!-- Timer & Stats & Audio Toggle -->
 			<div class="flex items-center gap-4">
 				{#if formattedCountdown}
 					<div class="flex items-center gap-1.5 text-sm">
@@ -142,6 +150,22 @@ t			{/if}
 						<span class="font-mono font-semibold text-warning">{formattedCountdown}</span>
 					</div>
 				{/if}
+
+				<!-- Audio cue toggle (Ch.14.5.1, U37, M28) -->
+				<button
+					type="button"
+					onclick={toggleAudio}
+					class="p-1.5 rounded-md transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center
+						{audioEnabled ? 'text-primary hover:bg-primary/10' : 'text-labels hover:bg-canvas'}"
+					aria-label={audioEnabled ? 'Disable audio cues' : 'Enable audio cues'}
+					title={audioEnabled ? 'Audio cues on' : 'Audio cues off'}
+				>
+					{#if audioEnabled}
+						<Volume2 class="w-4 h-4" />
+					{:else}
+						<VolumeX class="w-4 h-4" />
+					{/if}
+				</button>
 
 				{#if event.participantsOnline}
 					<div class="flex items-center gap-1.5 text-sm text-labels">

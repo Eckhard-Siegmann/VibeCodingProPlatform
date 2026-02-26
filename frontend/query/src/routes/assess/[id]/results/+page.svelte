@@ -13,10 +13,12 @@
 	import type { Priority, PriorityLevel } from '$lib/components/analytics';
 	import type { ItemResult } from '$lib/components/analytics';
 	import type { ResultsData } from './+page.server';
-	import { ArrowLeft, Filter, BarChart3, Table, TrendingUp } from '@lucide/svelte';
+	import { ArrowLeft, Filter, BarChart3, Table, TrendingUp, Download } from '@lucide/svelte';
+	import { generateCsv, downloadCsv, csvFilename } from '$lib/utils/csv';
 
 	interface PageData {
 		results: ResultsData;
+		isAdmin: boolean;
 	}
 
 	let { data }: { data: PageData } = $props();
@@ -169,6 +171,21 @@
 			history.back();
 		}
 	}
+
+	// CSV export (admin-only, Ch.15.3.4)
+	function exportCsv() {
+		const headers = ['Item', 'N', 'Mean', 'SD', 'Min', 'Max'];
+		const rows = data.results.items.map((item) => [
+			item.short_label,
+			item.n,
+			item.mean.toFixed(1),
+			item.sd.toFixed(1),
+			item.min,
+			item.max
+		]);
+		const csv = generateCsv(headers, rows);
+		downloadCsv(csv, csvFilename('rating_results'));
+	}
 </script>
 
 <PageContainer>
@@ -268,7 +285,7 @@
 					</div>
 				</div>
 
-				<!-- View toggle (always visible) -->
+				<!-- View toggle + CSV export (always visible) -->
 				<div class="flex items-center gap-1 border-l border-secondary pl-4">
 					<button
 						onclick={() => (viewMode = 'table')}
@@ -290,6 +307,12 @@
 					>
 						<BarChart3 class="w-4 h-4" />
 					</button>
+					{#if data.isAdmin}
+						<Button variant="outline" size="sm" onclick={exportCsv} class="ml-2">
+							<Download class="w-4 h-4 mr-1" />
+							CSV
+						</Button>
+					{/if}
 				</div>
 			</div>
 		</Card>

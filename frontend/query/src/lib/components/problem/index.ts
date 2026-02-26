@@ -8,7 +8,7 @@ export { default as VersionNav } from './VersionNav.svelte';
 export { default as DecisionTimeline } from './DecisionTimeline.svelte';
 export { default as AssessmentLinks } from './AssessmentLinks.svelte';
 export { default as POActionBar } from './POActionBar.svelte';
-export { default as PrivateWarningBanner } from './PrivateWarningBanner.svelte';
+export { default as OwnerBanner } from './OwnerBanner.svelte';
 export { default as BestPracticesLink } from './BestPracticesLink.svelte';
 
 // New components (Ch.13 enhancements)

@@ -1,4 +1,4 @@
-import type { Snippet, Component } from 'svelte';
+import type { Snippet } from 'svelte';
 
 /**
  * Table column definition for DataTable component
@@ -17,7 +17,7 @@ export interface TableColumn<T = unknown> {
  */
 export interface TableAction<T = unknown> {
 	label: string;
-	icon?: Snippet | Component<{ class?: string }>;
+	icon?: Snippet<[]>;
 	onclick: (row: T) => void;
 	variant?: 'default' | 'destructive';
 	hidden?: (row: T) => boolean;

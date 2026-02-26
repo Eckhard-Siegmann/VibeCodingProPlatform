@@ -33,21 +33,40 @@ Unlike participant dashboard, moderator dashboard MUST prioritize **mobile usabi
 
 ---
 
+## Z-Index Stacking Context
+
+**Added v1.2.0**: All moderator dashboard layers must respect the global navigation chrome z-index stack (Ch.12.7, Ch.26.16):
+
+| Layer | Z-Index | Position | Element |
+|-------|---------|----------|---------|
+| TopAppBar | `z-50` | `fixed top-0` | Brand bar + avatar menu |
+| LiveBanner | `z-40` | `sticky top-[var(--height-topbar-mobile)]` | Event state banner |
+| Page content | default | `static` | All dashboard sections below |
+| BottomNavBar | `z-50` | `fixed bottom-0` | Primary route navigation |
+
+**Content offset**: The dashboard wrapper `<div>` must apply `pt-[var(--height-topbar-mobile)] pb-[var(--height-bottomnav-mobile)]` (mobile) / `pt-[var(--height-topbar-desktop)] pb-[var(--height-bottomnav-desktop)]` (desktop) to prevent content from hiding beneath the fixed navigation bars.
+
+**Sticky sidebar** (desktop): Decision Accordion and Timer Controls use `position: sticky` with `top` set to `calc(var(--height-topbar-desktop) + var(--height-livebanner, 0px))` to avoid overlapping the TopAppBar and LiveBanner. Sticky elements must NOT use `z-index` above `z-30` to stay below the global chrome.
+
+---
+
 ## Layout
 
 ### Mobile (<768px) - Priority Order
 
 Per Ch.12.4, Decision #26:
 
-1. **Live Banner** (sticky top)
+1. **Live Banner** (sticky below TopAppBar, z-40)
 2. **Current Activity** (prominent)
 3. **Decision Accordion** (moderator-only, 7 categories)
 4. **Selected Problems** (for current event, collapsible if >3)
 5. **Timer Controls** (if phase active)
 6. **Attendance Tracking** (collapsible)
-7. **Pending Review Backlog** (collapsible, default collapsed)
-8. **Insights from Previous Event** (collapsible, default collapsed)
-9. **Activity Feed** (collapsible, default open)
+7. **Review Results Summary** (collapsible, visible when ≥1 review closed)
+7b. **Pitch Results Summary** (collapsible, visible when ≥1 pitch closed)
+8. **Pending Review Backlog** (collapsible, default collapsed)
+9. **Insights from Previous Event** (collapsible, default collapsed)
+10. **Activity Feed** (collapsible, default open)
 
 All sections collapsible except Live Banner and Current Activity (always visible).
 
@@ -59,12 +78,12 @@ All sections collapsible except Live Banner and Current Activity (always visible
 - Pending Review Backlog
 
 **Right (Sidebar, 30%)**:
-- Decision Accordion (sticky, scrollable if needed)
+- Decision Accordion (sticky below TopAppBar+LiveBanner, scrollable if needed)
 - Timer Controls (sticky)
 - Activity Feed (sticky, max-height)
 
 **Top Panel (Full-Width Above Columns)**:
-- Live Banner
+- Live Banner (sticky, z-40, positioned below TopAppBar z-50)
 - Event phase indicator
 - Quick stats (participants online, assessments completed)
 
@@ -375,25 +394,55 @@ Not all decisions are available in all states. The `DecisionAccordion` component
 **Visibility**: Moderator only
 **Collapsible**: Yes (default collapsed on mobile)
 
+### Scalable List Pattern (Ch.12.10)
+
+At scale, an event may have **50–500 registered attendees**. The attendance list MUST support server-side search and filtering to remain usable.
+
+**SearchBar** (`ui/SearchBar.svelte`):
+- Position: Below the section header, above the attendee list
+- Placeholder: `"Search by name..."`
+- Behavior: 300ms debounce, minimum 2 characters, `COLLATE NOCASE`
+- Searches: `display_name` and `email` columns
+- Mobile: Full-width below header when section is expanded
+- Desktop: Inline, 250px width
+
+**ListFilterBar** (`ui/ListFilterBar.svelte`):
+- Filters:
+  - **Mode**: `[All] [In-Presence] [Remote]`
+  - **Status**: `[All] [Checked In] [Not Yet]`
+- Desktop: Inline dropdown selects alongside SearchBar
+- Mobile: Horizontal scrollable pill bar below SearchBar
+
+**Pagination**: For events with >50 registrants, the list uses a **"Load More" append pattern** (not numbered pages) to keep the check-in workflow fluid:
+- Initial display: 50 attendees (sorted alphabetically)
+- "Load More" button appends 50 more
+- Total count always shown in header: `"Attendance (24/50 checked in, 247 registered)"`
+- Filters and search always apply server-side before pagination
+
+**URL State**: Attendance search/filter state is NOT persisted in URL (unlike main list views) because attendance is a transient operational workflow, not a shareable view.
+
 **Layout**:
 ```
 ┌──────────────────────────────────────────┐
-│ Attendance (24 registered)          [▼]  │ ← Collapsible header
+│ Attendance (20/24 checked in)       [▼]  │ ← Collapsible header
 │                                          │
-│ ☑ [Avatar] Max Mustermann (in-presence) │
-│ ☑ [Avatar] Eva Schmidt (in-presence)    │
-│ ☐ [Avatar] Tom Weber (remote)           │
-│ ☐ [Avatar] Lisa Chen (in-presence)      │
+│ [Search by name..._________________]     │ ← SearchBar
+│ [All] [In-Presence] [Remote]             │ ← ListFilterBar pills
+│ [All] [Checked In] [Not Yet]             │
+│                                          │
+│ ☑ [Avatar] Eva Schmidt (in-presence)     │
+│ ☑ [Avatar] Max Mustermann (in-presence)  │
+│ ☐ [Avatar] Lisa Chen (in-presence)       │
+│ ☐ [Avatar] Tom Weber (remote)            │
+│                                          │
+│ [Load More (showing 24 of 24)]           │ ← Only if >50
 │                                          │
 │ Show-up rate: 83% (20/24)                │
 │ In-presence: 15/18 (83%)                 │
 │ Remote: 5/6 (83%)                        │
 │                                          │
-│ Filter: [All] [In-Presence] [Remote]     │
-│         [Checked In] [Not Yet]           │
-│                                          │
-│ [Export Attendance CSV]                  │
-│ [Mark All Present]                       │
+│ [Export Attendance CSV]                   │
+│ [Mark All Present]                        │
 └──────────────────────────────────────────┘
 ```
 
@@ -406,18 +455,21 @@ Not all decisions are available in all states. The `DecisionAccordion` component
 **Mobile Optimization**:
 - Collapsed by default (reduce scroll)
 - Tap header to expand
-- Search/filter: Shows modal or bottom sheet on mobile
+- SearchBar: Full-width, always visible when expanded
+- Filter pills: Horizontal scroll bar
 - Bulk actions: Full-width buttons
 
 **Stats Calculation**:
 - Overall show-up rate: showed_up / total_registered
 - By attendance mode: Calculate separately for in-presence vs remote
 - Updates live as moderator checks boxes
+- Stats are calculated server-side from FULL dataset (not just visible page)
 
 **Export**:
 - CSV format: name, email, in_presence, showed_up, check_in_time
 - Filename: `{event-slug}-attendance-{date}.csv`
 - Uses browser download API
+- Exports ALL attendees regardless of current search/filter/pagination state
 
 ---
 
@@ -478,18 +530,48 @@ Moderators can quickly review insights from previous events and present a 2-minu
 **Filter**: `readiness_state = 'submitted'`
 **Sort**: By submitted_at (oldest first - FIFO queue)
 
+### Scalable List Pattern (Ch.12.10)
+
+At scale, up to **200 pending problems** may accumulate in the review backlog (multi-location community, multiple events queued). The section MUST be designed for server-side pagination.
+
+**Server-Side Pagination**:
+- Default page size: **10** problems per page
+- Pattern: **"Load More" append** (not numbered pages) — moderators process the queue top-down, appending older items progressively
+- "Load More" button shows: `"Load 10 more (showing 10 of 47)"`
+- Server query: `WHERE readiness_state = 'submitted' ORDER BY submitted_at ASC LIMIT ? OFFSET ?`
+- Total count always visible in header: `"Pending Review (47)"`
+
+**ListFilterBar** (`ui/ListFilterBar.svelte`):
+- Filters (optional, useful at scale):
+  - **Problem Type**: `[All] [Greenfield] [Brownfield] [Explorative] [Other]`
+  - **Age**: `[All] [Urgent (>7 days)] [Recent (<3 days)]`
+- Desktop: Inline dropdown selects below section header
+- Mobile: Horizontal scrollable pill bar
+
+**URL State**: Pending Review filter/pagination state is NOT persisted in URL (this is a dashboard sub-section, not a standalone page).
+
 **Layout**:
 ```
 ┌──────────────────────────────────────────┐
-│ Pending Review (5)                  [▶]  │
+│ Pending Review (47)                 [▶]  │
+│                                          │
+│ [All Types ▼] [All Ages ▼]              │ ← ListFilterBar
 │                                          │
 │ ┌──────────────────────────────────────┐ │
 │ │ Database Migration Tool              │ │
-│ │ Tom Weber • Submitted 3 days ago     │ │
+│ │ Tom Weber • Submitted 9 days ago     │ │ ← Red (>7 days)
 │ │ [Accept] [Changes] [Reject]          │ │
 │ └──────────────────────────────────────┘ │
 │                                          │
-│ {4 more problems}                        │
+│ ┌──────────────────────────────────────┐ │
+│ │ Auth Service Refactor                │ │
+│ │ Lisa Chen • Submitted 5 days ago     │ │ ← Yellow (3-7 days)
+│ │ [Accept] [Changes] [Reject]          │ │
+│ └──────────────────────────────────────┘ │
+│                                          │
+│ {8 more on this page}                    │
+│                                          │
+│ [Load 10 more (showing 10 of 47)]        │
 └──────────────────────────────────────────┘
 ```
 
@@ -515,26 +597,27 @@ Moderators can quickly review insights from previous events and present a 2-minu
 ### Mobile (<768px)
 
 **Priority Order**:
-1. Live Banner (sticky)
+1. Live Banner (sticky below TopAppBar z-50, uses z-40)
 2. Current Activity
 3. Decision Accordion
 4. Selected Problems (collapsible if >3)
 5. Timer Controls (if active)
-6. Attendance (collapsed default)
-7. Pending Review (collapsed default)
+6. Attendance (collapsed default, with SearchBar when expanded)
+7. Pending Review (collapsed default, with "Load More" pagination)
 8. Insights (collapsed default)
 9. Activity Feed (collapsed default)
 
-**Sticky**: Live Banner only
+**Sticky**: TopAppBar (z-50, fixed) + Live Banner (z-40, sticky) + BottomNavBar (z-50, fixed)
+**Content padding**: `pt-[var(--height-topbar-mobile)] pb-[var(--height-bottomnav-mobile)]`
 **Collapsible**: All sections except banner and current activity
 
 ### Desktop (≥768px)
 
 **Layout**: Two-column with sticky sidebar
 - Left: Main content, scrollable
-- Right: Decision Accordion + Timer (sticky)
-- Top: Live Banner (full-width)
-- Bottom: Attendance (expandable panel)
+- Right: Decision Accordion + Timer (sticky, `top` offset = TopAppBar + LiveBanner heights)
+- Top: Live Banner (full-width, z-40 below TopAppBar z-50)
+- Bottom: Attendance (expandable panel, with SearchBar + filter pills)
 
 ---
 
@@ -587,6 +670,197 @@ Moderators can quickly review insights from previous events and present a 2-minu
 
 ---
 
+## Review Results Summary
+
+**Visibility**: Appears when at least one review assessment has been closed for the event.
+**Position**: After "Selected Problems" section, before "Pending Review Backlog" on mobile. In desktop two-column layout, right column below Timer Controls.
+
+### List Bounds
+
+Review results are bounded by the event queue size (typically 3–20 problems per event). No server-side pagination is needed. However, as a safety cap:
+- **Maximum display**: 20 problems (matching a realistic event ceiling)
+- If an event somehow exceeds 20 coded problems, the table shows the top 20 by weighted average with a note: `"Showing top 20 of {N} reviewed problems. View all →"`
+- The "View all →" link navigates to a full results page with `Pagination.svelte` (Ch.12.10 pattern)
+
+### Card Structure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ ⭐ Review Results                              [View All →] │
+│                                                              │
+│ ┌───┬─────────────────────┬───────┬────────┬──────────────┐ │
+│ │ # │ Problem              │ N     │ Score  │ Items        │ │
+│ ├───┼─────────────────────┼───────┼────────┼──────────────┤ │
+│ │ 1 │ API Rate Limiter     │ 12    │ 4.2    │ ▃▅▆▇▅▄▆▅    │ │
+│ │ 2 │ CLI Parser           │ 10    │ 3.8    │ ▄▃▅▆▄▃▅▄    │ │
+│ │ 3 │ Database Migration   │  8    │ 3.4    │ ▃▂▄▅▃▂▄▃    │ │
+│ └───┴─────────────────────┴───────┴────────┴──────────────┘ │
+│                                                              │
+│ N = distinct reviewers │ Score = weighted avg (excl meta)    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Design Tokens
+
+```
+Card: elevation="resting", padding="md"
+Header icon: Star (lucide), text-warning (amber)
+Header title: "Review Results" - text-lg font-semibold text-headers
+"View All" link: text-sm text-primary hover:text-primary-hover → navigates to results page
+
+Table:
+  Rank column:  w-8, text-center, font-mono
+  Problem:      flex-1, font-medium text-headers, truncate on mobile
+  N:            w-12, text-center, text-meta
+  Score:        w-16, text-center, font-semibold
+                Score ≥ 4.0: text-success
+                Score 3.0-3.9: text-headers
+                Score < 3.0: text-error
+  Items:        w-24, hidden on mobile (<768px)
+                Sparkline of per-item means (8 data points, excluding meta items)
+                Uses SparkLine component from charts/
+
+Rank badge styling:
+  #1: bg-warning/10 text-warning font-bold (gold tint)
+  #2: bg-secondary/30 text-labels font-semibold (silver tint)
+  #3: bg-[#CD7F32]/10 text-[#CD7F32] font-semibold (bronze tint)
+  Others: text-meta
+```
+
+### Mobile (<768px)
+
+- Items sparkline column hidden (not enough width)
+- Problem title truncated with ellipsis after ~20 chars
+- Table rows minimum height 48px for touch targets
+- Card collapsible (default open if ≤3 problems, collapsed if >3)
+
+### Desktop (≥1024px)
+
+- Full table with sparkline column
+- Sortable columns (click header to toggle sort)
+- Hover row highlights with bg-canvas/50
+- "View All" navigates to `/assess/{assessmentId}/results` for the selected problem
+
+### Data Source
+
+- API endpoint: `GET /api/events/[eventId]/review-results`
+- Returns array of reviewed problems with:
+  - `problem_id`, `problem_title`, `problem_slug`
+  - `assessment_id` (for navigation to results page)
+  - `response_count` (distinct reviewers)
+  - `weighted_average` (mean of per-item weighted means, excluding meta items)
+  - `item_means` (array of 8 floats for sparkline: correctness through extensibility + completion_degree + time_efficiency)
+  - `rank` (ordinal by weighted_average descending)
+- Sorted by rank ascending
+
+### Empty State
+
+If event has no closed review assessments:
+```
+┌─────────────────────────────────────────────────────┐
+│ ⭐ Review Results                                    │
+│                                                      │
+│     📊 No review results yet                        │
+│     Results appear here after closing a review       │
+│     session.                                         │
+└─────────────────────────────────────────────────────┘
+```
+
+### Interaction with Moderator Dashboard Layout
+
+Add to mobile priority order (between items 6 and 7):
+```
+6.5  **Review Results Summary** (collapsible, default open)
+6.6  **Pitch Results Summary** (collapsible, default open)
+```
+
+Add to desktop two-column layout:
+- Right column, after Timer Controls, before Pending Review Backlog
+
+---
+
+## Pitch Results Summary
+
+**Visibility**: Appears when at least one pitch assessment has been closed for the event.
+**Position**: After "Review Results Summary" section in mobile priority order; same column on desktop.
+
+### List Bounds
+
+Pitch results are bounded by the event queue size (typically 3–20 problems per event). No server-side pagination is needed. Same safety cap as Review Results:
+- **Maximum display**: 20 problems
+- Overflow: "Showing top 20 of {N} pitched problems." with link to full results
+
+### Card Structure
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 📊 Pitch Results                                            │
+│                                                              │
+│ ┌─────────────────────┬───────┬────────┬──────────────────┐ │
+│ │ Problem              │ N     │ Avg    │ Items            │ │
+│ ├─────────────────────┼───────┼────────┼──────────────────┤ │
+│ │ API Rate Limiter     │ 18    │ 3.9    │ ▃▅▆▇▅            │ │
+│ │ CLI Parser           │ 16    │ 3.6    │ ▄▃▅▆▄            │ │
+│ │ Database Migration   │ 15    │ 3.2    │ ▃▂▄▅▃            │ │
+│ └─────────────────────┴───────┴────────┴──────────────────┘ │
+│                                                              │
+│ N = distinct respondents │ Avg = mean of item means          │
+│ (No ranking — pitch results inform discussion, not outcomes) │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Differences from Review Results Summary
+
+- **No ranking column**: Per Ch.15.1, pitch results never show rankings or winner indicators
+- **No weighting**: Simple AVG(rating_value), no review_weight_catalog multipliers
+- **Sort order**: Pitch order (event queue position_index), not by score
+- **All items included**: No meta-item exclusion (meta items are review-only)
+- **Purpose**: Inform group discussion about which problems to pursue
+
+### Design Tokens
+
+```
+Card: elevation="resting", padding="none"
+Header icon: BarChart3 (lucide), text-primary
+Header title: "Pitch Results" - text-lg font-semibold text-headers
+
+Table:
+  Problem:      flex-1, font-medium text-headers, truncate on mobile
+  N:            w-12, text-center, text-meta
+  Avg:          w-16, text-center, font-semibold text-headers
+  Items:        w-24, hidden on mobile (<768px)
+                Sparkline of per-item means
+                Uses inline SVG bars (same as ReviewResultsSummary)
+
+No rank badge styling (pitch has no ranking).
+```
+
+### Data Source
+
+- Uses `getEventPitchResults(eventId)` from responses repository
+- Returns array of pitched problems with:
+  - `problem_id`, `problem_title`, `problem_slug`
+  - `assessment_id` (for navigation to individual results page)
+  - `response_count` (distinct respondents)
+  - `overall_average` (mean of per-item means, all items)
+  - `item_means` (array of floats for sparkline)
+- Sorted by pitch order (queue position), NOT by score
+
+### Empty State
+
+Section hidden entirely when no closed pitch assessments exist for the event.
+
+### CSV Export Button
+
+An admin-only "Download CSV" button in the card footer:
+```
+│ [📥 Download CSV]                   (admin role only) │
+```
+- Generates CSV client-side from the rendered pitch results data
+- Filename: `pitch_results_{ISO_date}.csv`
+
+---
+
 ## Testing Checklist
 
 - [ ] Decision accordion renders 7 categories
@@ -603,20 +877,46 @@ Moderators can quickly review insights from previous events and present a 2-minu
 - [ ] Close Phase button works
 - [ ] Audio toggle persists preference
 - [ ] Attendance checkboxes update database
-- [ ] Show-up rate calculates correctly
-- [ ] Export attendance CSV works
+- [ ] Attendance SearchBar filters by name (300ms debounce)
+- [ ] Attendance filter pills work (mode + status)
+- [ ] Attendance "Load More" appends next batch for 50+ attendees
+- [ ] Show-up rate calculates correctly (from full dataset, not visible page)
+- [ ] Export attendance CSV exports ALL attendees (ignoring current filter/pagination)
 - [ ] Insights sections load data
 - [ ] Insights expand/collapse correctly
+- [ ] Pending Review "Load More" appends 10 more problems
+- [ ] Pending Review total count shown in header
+- [ ] Pending Review filter pills work (type, age)
+- [ ] Review results summary hidden when no closed reviews
+- [ ] Review results summary shows ranked problems after review close
+- [ ] Review results sparklines render per-item means
+- [ ] Review results scores color-coded by threshold
+- [ ] Review/Pitch results capped at 20 problems with overflow link
+- [ ] Z-index: TopAppBar (z-50) above LiveBanner (z-40) above content
+- [ ] Z-index: BottomNavBar (z-50) visible at bottom
+- [ ] Z-index: Sticky sidebar below TopAppBar+LiveBanner
+- [ ] Content padding prevents overlap with fixed TopAppBar and BottomNavBar
 - [ ] Mobile: All sections accessible at 375px
 - [ ] Mobile: Touch targets ≥44px
 - [ ] Mobile: No horizontal overflow
 - [ ] Desktop: Two-column layout
-- [ ] Desktop: Sticky sidebar
+- [ ] Desktop: Sticky sidebar respects TopAppBar offset
 - [ ] Keyboard navigation works
 - [ ] Screen reader announces decision actions
 
 ---
 
-**Document Version**: 1.0.0
-**Lines**: ~400
+## Section: Email Templates Sub-Page Link
+
+The moderator dashboard's existing **TemplateEditor** card includes a link to the dedicated Email Templates management page at `/dashboard/moderator/emails/[eventId]`. This link appears as a "View History" button in the TemplateEditor card header, allowing moderators to access the full template version history (M31) and revert to older versions.
+
+The dedicated email templates page is specified in `frontend/pagedesign/email_templates_design.md`.
+
+---
+
+**Document Version**: 1.2.0
+**Lines**: ~510
 **Status**: Complete
+**Changelog**:
+- v1.2.0 (2026-02-25): Added z-index stacking context section (Ch.12.7, Ch.26.16), server-side pagination for Pending Review Backlog and Attendance Tracking (Ch.12.10), explicit list bounds for Review/Pitch Results, updated responsive behavior and testing checklist
+- v1.1.0: Added Review Results Summary and Pitch Results Summary sections (TICKET-23)

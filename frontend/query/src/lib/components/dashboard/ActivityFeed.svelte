@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Card } from '$lib/components/ui/card';
 	import { Badge } from '$lib/components/ui/badge';
-	import { InitialAvatar } from '$lib/components/ui/initial-avatar';
+	import { Button } from '$lib/components/ui/button';
 	import EmptyState from '$lib/components/ui/empty-state/empty-state.svelte';
 	import { cn } from '$lib/utils';
 	import { formatRelative } from '$lib/utils/date-formatting';
@@ -41,23 +41,63 @@
 
 	interface Props {
 		activities: ActivityItem[];
+		totalCount?: number;
+		loadMoreUrl?: string;
+		maxTotal?: number;
 		title?: string;
-		maxItems?: number;
-		showViewAll?: boolean;
-		viewAllHref?: string;
 		class?: string;
 	}
 
 	let {
 		activities,
+		totalCount = 0,
+		loadMoreUrl,
+		maxTotal = 50,
 		title = 'Recent Activity',
-		maxItems = 10,
-		showViewAll = false,
-		viewAllHref = '/activity',
 		class: className
 	}: Props = $props();
 
-	const displayedActivities = $derived(activities.slice(0, maxItems));
+	// Internal state for "Load More" append pagination
+	let allActivities = $state<ActivityItem[]>([]);
+	let loading = $state(false);
+
+	// Sync initial activities from prop
+	$effect(() => {
+		allActivities = [...activities];
+	});
+
+	const showLoadMore = $derived(
+		loadMoreUrl &&
+		allActivities.length < totalCount &&
+		allActivities.length < maxTotal
+	);
+
+	async function loadMore() {
+		if (!loadMoreUrl || loading) return;
+		loading = true;
+		try {
+			const res = await fetch(`${loadMoreUrl}?offset=${allActivities.length}&limit=10`);
+			if (!res.ok) throw new Error('Failed to load activity');
+			const data = await res.json();
+			if (data.items?.length > 0) {
+				allActivities = [...allActivities, ...data.items.map((a: any) => ({
+					id: a.id,
+					type: a.type ?? 'decision_made',
+					title: a.title,
+					description: a.description ?? undefined,
+					actor: a.actorId ? { id: a.actorId, displayName: a.actorDisplayName } : undefined,
+					problemTitle: a.problemTitle ?? undefined,
+					problemSlug: a.problemSlug ?? undefined,
+					href: a.problemSlug ? `/problem/${a.problemSlug}` : undefined,
+					timestamp: a.timestamp
+				}))];
+			}
+		} catch {
+			// Error handled silently — items unchanged, button re-enabled
+		} finally {
+			loading = false;
+		}
+	}
 
 	const activityIcons: Record<ActivityType, typeof FileText> = {
 		problem_submitted: FileText,
@@ -83,14 +123,16 @@
 <section class={cn('space-y-3', className)}>
 	{#if title}
 		<div class="flex items-center justify-between">
-			<h2 class="text-lg font-semibold text-headers">{title}</h2>
-			{#if showViewAll && activities.length > maxItems}
-				<a href={viewAllHref} class="text-sm text-primary hover:underline">View all</a>
-			{/if}
+			<h2 class="text-lg font-semibold text-headers">
+				{title}
+				{#if totalCount > 0}
+					<span class="text-sm font-normal text-labels">({totalCount})</span>
+				{/if}
+			</h2>
 		</div>
 	{/if}
 
-	{#if activities.length === 0}
+	{#if allActivities.length === 0}
 		<EmptyState
 			icon="📊"
 			title="No recent activity"
@@ -99,7 +141,7 @@
 	{:else}
 		<Card elevation="resting" padding="none">
 			<ul class="divide-y divide-secondary">
-				{#each displayedActivities as activity (activity.id)}
+				{#each allActivities as activity (activity.id)}
 					{@const IconComponent = activityIcons[activity.type]}
 					{@const iconColorClass = activityColors[activity.type]}
 
@@ -120,6 +162,14 @@
 				{/each}
 			</ul>
 		</Card>
+
+		{#if showLoadMore}
+			<div class="pt-1">
+				<Button variant="outline" size="sm" onclick={loadMore} disabled={loading}>
+					{loading ? 'Loading...' : `Load more activity (showing ${allActivities.length} of ${totalCount})`}
+				</Button>
+			</div>
+		{/if}
 	{/if}
 </section>
 

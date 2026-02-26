@@ -6,6 +6,7 @@
 	interface Props {
 		checked?: boolean | 'indeterminate';
 		disabled?: boolean;
+		name?: string;
 		label?: string;
 		description?: string;
 		onchange?: (checked: boolean | 'indeterminate') => void;
@@ -16,6 +17,7 @@
 	let {
 		checked = $bindable(false),
 		disabled = false,
+		name,
 		label,
 		description,
 		onchange,

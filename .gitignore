@@ -14,9 +14,13 @@ database/.sqlite-tools/
 
 # Temp/build artifacts
 nul
+temp/
 frontend/query/check-*.txt
+frontend/query/svelte-build.log
+frontend/query/svelte-check*.log
 frontend/query/test-results/
 ui-test-results/
+search_*.txt
 
 # QA report artifacts
 BATCH*.txt

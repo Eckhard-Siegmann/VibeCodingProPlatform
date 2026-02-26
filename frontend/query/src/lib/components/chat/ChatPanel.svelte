@@ -8,7 +8,7 @@
 	 * - Message list (scrollable, 4000px max-height)
 	 * - Default scroll to bottom (newest messages)
 	 * - Message grouping for consecutive same-user messages
-	 * - Threading support
+	 * - Threading: top-level messages rendered flat; replies collapsed under parents (Ch.26.15.3)
 	 * - Chat input with mentions and emoji
 	 */
 	import type { HTMLAttributes } from 'svelte/elements';
@@ -71,11 +71,64 @@
 		{ key: 'has_url', label: 'Has URL' }
 	];
 
-	// Filter messages
+	// ── Thread tree building (Ch.26.15.3) ─────────────────────────────
+	// Build a map of parentId → direct replies, and identify top-level messages.
+	// A "top-level" message has no replyToMessageId (or replies to a message
+	// not present in the current filtered set).
+
+	interface ThreadEntry {
+		message: ChatMessageData;
+		replies: ChatMessageData[];
+	}
+
+	/**
+	 * Build thread structure from flat message list.
+	 * Returns an array of ThreadEntry objects for rendering.
+	 * Top-level messages appear in order; their replies are grouped under them.
+	 */
+	function buildThreads(msgs: ChatMessageData[]): ThreadEntry[] {
+		const messageSet = new Set(msgs.map((m) => m.messageId));
+		const replyMap = new Map<string, ChatMessageData[]>();
+		const topLevel: ChatMessageData[] = [];
+
+		// First pass: separate top-level from replies
+		for (const msg of msgs) {
+			if (!msg.replyToMessageId || !messageSet.has(msg.replyToMessageId)) {
+				// Top-level message (or reply to a message not in current set)
+				topLevel.push(msg);
+			} else {
+				// Find the root parent of this reply chain
+				let rootId = msg.replyToMessageId;
+				const visited = new Set<string>();
+				visited.add(msg.messageId);
+
+				// Walk up the reply chain to find the top-level ancestor
+				let current = msgs.find((m) => m.messageId === rootId);
+				while (current?.replyToMessageId && messageSet.has(current.replyToMessageId) && !visited.has(current.replyToMessageId)) {
+					visited.add(current.messageId);
+					rootId = current.replyToMessageId;
+					current = msgs.find((m) => m.messageId === rootId);
+				}
+
+				const replies = replyMap.get(rootId) ?? [];
+				replies.push(msg);
+				replyMap.set(rootId, replies);
+			}
+		}
+
+		// Build ThreadEntry array
+		return topLevel.map((msg) => ({
+			message: msg,
+			replies: replyMap.get(msg.messageId) ?? []
+		}));
+	}
+
+	// Filtered messages (apply quick filters first, then build threads)
 	const filteredMessages = $derived.by(() => {
 		let result = messages;
 
-		// Apply quick filter
+		// Apply quick filter — for thread-aware filtering, include a message if
+		// either it matches OR any of its thread replies match.
 		switch (activeFilter) {
 			case 'moderator':
 				result = result.filter((m) => m.authorRole === 'moderator' || m.authorRole === 'admin');
@@ -91,15 +144,26 @@
 		return result;
 	});
 
-	// Group messages (show header only on first of consecutive same-user messages within 2min)
-	function shouldShowHeader(message: ChatMessageData, index: number): boolean {
-		if (index === 0) return true;
-		if (message.isBot) return true; // System messages always show
+	// Thread entries from filtered messages
+	const threadEntries = $derived(buildThreads(filteredMessages));
 
-		const prevMessage = filteredMessages[index - 1];
-		if (!prevMessage) return true;
+	// Group messages (show header only on first of consecutive same-user messages within 2min)
+	// Only applies to top-level (non-threaded) messages rendered sequentially.
+	function shouldShowHeader(index: number): boolean {
+		if (index === 0) return true;
+
+		const entry = threadEntries[index];
+		const prevEntry = threadEntries[index - 1];
+		if (!entry || !prevEntry) return true;
+
+		const message = entry.message;
+		const prevMessage = prevEntry.message;
+
+		if (message.isBot) return true; // System messages always show
 		if (prevMessage.isBot) return true; // After system message
 		if (prevMessage.authorId !== message.authorId) return true;
+		// Don't group across threaded messages
+		if (prevEntry.replies.length > 0) return true;
 
 		// Check time gap
 		const prevTime = new Date(prevMessage.createdAt).getTime();
@@ -200,7 +264,7 @@
 		class="flex-1 overflow-y-auto p-4 space-y-2"
 		style="max-height: 4000px;"
 	>
-		{#if filteredMessages.length === 0}
+		{#if threadEntries.length === 0}
 			<div class="flex flex-col items-center justify-center py-12 text-center">
 				<span class="text-4xl mb-3">&#x1F4AC;</span>
 				<p class="text-sm text-meta">
@@ -212,13 +276,24 @@
 				</p>
 			</div>
 		{:else}
-			{#each filteredMessages as message, index (message.messageId)}
-				<ChatMessage
-					{message}
-					showHeader={shouldShowHeader(message, index)}
-					onReply={() => handleReply(message.messageId)}
-					onReact={(emoji) => handleReact(message.messageId, emoji)}
-				/>
+			{#each threadEntries as entry, index (entry.message.messageId)}
+				{#if entry.replies.length > 0}
+					<!-- Threaded message: use ChatThread for collapse/expand -->
+					<ChatThread
+						parentMessage={entry.message}
+						replies={entry.replies}
+						onReply={handleReply}
+						onReact={handleReact}
+					/>
+				{:else}
+					<!-- Non-threaded message: render inline -->
+					<ChatMessage
+						message={entry.message}
+						showHeader={shouldShowHeader(index)}
+						onReply={() => handleReply(entry.message.messageId)}
+						onReact={(emoji) => handleReact(entry.message.messageId, emoji)}
+					/>
+				{/if}
 			{/each}
 		{/if}
 	</div>

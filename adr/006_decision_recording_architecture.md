@@ -6,7 +6,7 @@
 
 ## Context
 
-The platform specification defines 26 decision types across 8 categories (Ch.10, Ch.19 §19.2.3), a `decision_state_effects` mapping table (Ch.19 §19.2.4), an ejection cleanup invariant for the event queue (Ch.19 §19.3.19), and lazy timer auto-closure (Ch.14 §14.5.1.1). Each decision may trigger multiple side-effects: state changes on the problem, live context transitions, assessment lifecycle events, and queue mutations.
+The platform specification defines 26 decision types across 8 categories (Ch.10, Ch.19 §19.2.3), a `decision_state_effects` mapping table (Ch.19 §19.2.4), an ejection cleanup invariant for the event queue (Ch.19 §19.3.21), and lazy timer auto-closure (Ch.14 §14.5.1.1). Each decision may trigger multiple side-effects: state changes on the problem, live context transitions, assessment lifecycle events, and queue mutations.
 
 These side-effects must be orchestrated atomically — a partial application (e.g., decision inserted but queue not updated) would leave the system in an inconsistent state. The specification defines WHAT happens; this ADR captures HOW the side-effects are orchestrated in a single code path.
 
@@ -26,10 +26,10 @@ The `recordDecision()` function executes the following steps within one transact
 | 4 | Auto-close previous pitch if opening a new one (S8 invariant) | Ch.14 §14.5.1 |
 | 5 | INSERT decision row into `decisions` table | Ch.10 |
 | 6a | Apply readiness/action state effects to `problems` table | Ch.19 §19.2.4 |
-| 6b | Ejection safety: if ejecting the currently active problem, force live context to idle and close open assessments | Ch.19 §19.3.19 |
+| 6b | Ejection safety: if ejecting the currently active problem, force live context to idle and close open assessments | Ch.19 §19.3.21 |
 | 7 | Update `event_live_context` (mode, timer, problem pointer) | Ch.14 §14.5 |
 | 8 | Assessment lifecycle: create on open, close on close | Ch.08 |
-| 9 | Queue sync: add, remove, or update `event_problem_queue` | Ch.19 §19.3.19 |
+| 9 | Queue sync: add, remove, or update `event_problem_queue` | Ch.19 §19.3.21 |
 
 Step ordering is significant:
 - Step 4 before Step 5: the auto-close decision must be recorded before the new decision.
@@ -98,6 +98,6 @@ This reuses the full transaction chain — all side-effects (assessment closure,
 - Platform Spec Ch.14 §14.5.1.1 — Timer auto-closure architecture
 - Platform Spec Ch.19 §19.2.3 — Decision type catalog + implementation requirement
 - Platform Spec Ch.19 §19.2.4 — Decision state effects mapping
-- Platform Spec Ch.19 §19.3.19 — Ejection cleanup invariant
+- Platform Spec Ch.19 §19.3.21 — Ejection cleanup invariant
 - ADR 001 — Database engine strategy (SQLite dev / PostgreSQL prod)
 - ADR 002 — Frontend technology stack (constants module convention)

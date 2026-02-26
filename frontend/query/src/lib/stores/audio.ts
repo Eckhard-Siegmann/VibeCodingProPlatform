@@ -52,13 +52,10 @@ function createAudioStore() {
 			if (!browser) return;
 
 			try {
-				// Try to load from localStorage first
+				// Load from localStorage as fallback; server hydration via
+				// +layout.svelte provides the DB-backed preference (TICKET-27).
 				const stored = localStorage.getItem('audio_cues_enabled');
 				const enabled = stored === 'true';
-
-				// TODO: Later, fetch from user settings API
-				// const response = await fetch('/api/user/preferences');
-				// const { audio_cues_enabled } = await response.json();
 
 				update((state) => ({
 					...state,

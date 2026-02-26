@@ -140,16 +140,72 @@ INSERT INTO decisions (decision_id, problem_id, major_version, decision_type, is
   ('dec-dspy-01', 'prob-dspy-003', 1, 'problem_created', 1, 'demo-user-001', NULL, '2026-02-01T09:00:00Z');
 
 --------------------------------------------------------------------------------
+-- 5b. PROBLEM RESOURCES (Ch.6.2, Ch.19.3.24)
+--------------------------------------------------------------------------------
+
+-- RAG problem: Direct resources (auto-approved by PO)
+INSERT INTO problem_resources (resource_id, problem_id, url, title, resource_type, added_by_user_id, approved, approved_by_user_id, created_at) VALUES
+  ('res-rag-01', 'prob-rag-001', 'https://github.com/demo/rag-retrieval-quality', 'Main Repository', 'direct', 'demo-user-001', 1, 'demo-user-001', '2026-01-20T10:30:00Z'),
+  ('res-rag-02', 'prob-rag-001', 'https://github.com/demo/rag-test-suite', 'Test Suite', 'direct', 'demo-user-001', 1, 'demo-user-001', '2026-01-20T10:35:00Z');
+
+-- RAG problem: Helpful artifacts
+INSERT INTO problem_resources (resource_id, problem_id, url, title, resource_type, added_by_user_id, approved, approved_by_user_id, created_at) VALUES
+  ('res-rag-03', 'prob-rag-001', 'https://docs.llamaindex.ai/en/stable/', 'LlamaIndex Documentation', 'helpful', 'demo-user-003', 1, 'demo-user-003', '2026-01-25T15:00:00Z'),
+  ('res-rag-04', 'prob-rag-001', 'https://arxiv.org/abs/2312.10997', 'RAG Survey Paper (2024)', 'helpful', 'demo-user-004', 0, NULL, '2026-02-10T09:00:00Z');
+
+-- Code Eval problem: Direct resource
+INSERT INTO problem_resources (resource_id, problem_id, url, title, resource_type, added_by_user_id, approved, approved_by_user_id, created_at) VALUES
+  ('res-eval-01', 'prob-eval-002', 'https://github.com/demo/code-eval-agent', 'Main Repository', 'direct', 'demo-user-003', 1, 'demo-user-003', '2026-01-25T14:10:00Z');
+
+-- DSPy problem: Direct resource
+INSERT INTO problem_resources (resource_id, problem_id, url, title, resource_type, added_by_user_id, approved, approved_by_user_id, created_at) VALUES
+  ('res-dspy-01', 'prob-dspy-003', 'https://github.com/stanfordnlp/dspy', 'DSPy Framework', 'helpful', 'demo-user-001', 1, 'demo-user-001', '2026-02-01T09:30:00Z');
+
+--------------------------------------------------------------------------------
+-- 5c. REPO SNAPSHOTS (Ch.5.2, Ch.19.3.14)
+--------------------------------------------------------------------------------
+
+-- RAG problem v2: One snapshot recorded during pitch assessment
+INSERT INTO problem_repo_snapshots (snapshot_id, problem_id, major_version, minor_version, head_commit_sha, first_seen_at) VALUES
+  ('snap-rag-01', 'prob-rag-001', 2, 1, 'a1b2c3d4e5f6789012345678901234567890abcd', '2026-02-28T17:20:00Z');
+
+--------------------------------------------------------------------------------
 -- 6. ASSESSMENTS (linked to problems for the assess/ routes)
 --------------------------------------------------------------------------------
 
--- Pitch assessment for RAG problem (open)
+-- Pitch assessment for RAG problem (closed — demo for pitch results summary)
 INSERT INTO assessments (assessment_id, problem_id, major_version, inventory_id, event_id, opened_at, closed_at) VALUES
-  ('pitch-11', 'prob-rag-001', 2, '4c9a2b1d-8f7e-4c1a-9b3e-2d7e8f9a0b03', 'event-feb-2026', '2026-02-28T17:15:00Z', NULL);
+  ('pitch-11', 'prob-rag-001', 2, '4c9a2b1d-8f7e-4c1a-9b3e-2d7e8f9a0b03', 'event-feb-2026', '2026-02-28T17:15:00Z', '2026-02-28T17:25:00Z');
 
 -- Review assessment for RAG problem (open)
 INSERT INTO assessments (assessment_id, problem_id, major_version, inventory_id, event_id, opened_at, closed_at) VALUES
   ('review-11', 'prob-rag-001', 2, '9f0a1b2c-3d4e-4f5a-9b6c-3e4f5a6b0b04', 'event-feb-2026', '2026-02-28T19:30:00Z', NULL);
+
+-- Demo pitch responses for RAG problem (3 respondents × 6 items = 18 responses)
+-- Respondent 1: demo-user-003 (Lisa)
+INSERT INTO responses (response_id, assessment_id, item_id, user_id, role, time_context, in_presence, rating_value, review_weight_key, created_at) VALUES
+  ('pr-001', 'pitch-11', '7b4f1a3d-5d9e-4bd1-8db5-5c9e1f0baa16', 'demo-user-003', 'observer', 'pitch', 1, 4, NULL, '2026-02-28T17:16:00Z'),
+  ('pr-002', 'pitch-11', '4a2f5e9c-7b4b-4b27-9f5e-4e8d1f9faa15', 'demo-user-003', 'observer', 'pitch', 1, 5, NULL, '2026-02-28T17:16:00Z'),
+  ('pr-003', 'pitch-11', '1e9c2d7a-4c8f-4e27-8a1f-7a9b1c2caa17', 'demo-user-003', 'observer', 'pitch', 1, 4, NULL, '2026-02-28T17:16:00Z'),
+  ('pr-004', 'pitch-11', '3d0e3c9a-5a61-4a55-8a8e-4d6b5a9eaa15', 'demo-user-003', 'observer', 'pitch', 1, 3, NULL, '2026-02-28T17:16:00Z'),
+  ('pr-005', 'pitch-11', '2b6c0b5b-0a1f-4b5d-b5a4-4bd7e9a9aa10', 'demo-user-003', 'observer', 'pitch', 1, 4, NULL, '2026-02-28T17:16:00Z'),
+  ('pr-006', 'pitch-11', '0b7a9c2d-6d3e-4c2a-9a1f-3b7c9d1daa18', 'demo-user-003', 'observer', 'pitch', 1, 4, NULL, '2026-02-28T17:16:00Z');
+-- Respondent 2: demo-user-004 (Tom)
+INSERT INTO responses (response_id, assessment_id, item_id, user_id, role, time_context, in_presence, rating_value, review_weight_key, created_at) VALUES
+  ('pr-007', 'pitch-11', '7b4f1a3d-5d9e-4bd1-8db5-5c9e1f0baa16', 'demo-user-004', 'developer', 'pitch', 1, 3, NULL, '2026-02-28T17:17:00Z'),
+  ('pr-008', 'pitch-11', '4a2f5e9c-7b4b-4b27-9f5e-4e8d1f9faa15', 'demo-user-004', 'developer', 'pitch', 1, 4, NULL, '2026-02-28T17:17:00Z'),
+  ('pr-009', 'pitch-11', '1e9c2d7a-4c8f-4e27-8a1f-7a9b1c2caa17', 'demo-user-004', 'developer', 'pitch', 1, 3, NULL, '2026-02-28T17:17:00Z'),
+  ('pr-010', 'pitch-11', '3d0e3c9a-5a61-4a55-8a8e-4d6b5a9eaa15', 'demo-user-004', 'developer', 'pitch', 1, 4, NULL, '2026-02-28T17:17:00Z'),
+  ('pr-011', 'pitch-11', '2b6c0b5b-0a1f-4b5d-b5a4-4bd7e9a9aa10', 'demo-user-004', 'developer', 'pitch', 1, 3, NULL, '2026-02-28T17:17:00Z'),
+  ('pr-012', 'pitch-11', '0b7a9c2d-6d3e-4c2a-9a1f-3b7c9d1daa18', 'demo-user-004', 'developer', 'pitch', 1, 3, NULL, '2026-02-28T17:17:00Z');
+-- Respondent 3: demo-user-002 (Eva/moderator)
+INSERT INTO responses (response_id, assessment_id, item_id, user_id, role, time_context, in_presence, rating_value, review_weight_key, created_at) VALUES
+  ('pr-013', 'pitch-11', '7b4f1a3d-5d9e-4bd1-8db5-5c9e1f0baa16', 'demo-user-002', 'moderator', 'pitch', 1, 4, NULL, '2026-02-28T17:18:00Z'),
+  ('pr-014', 'pitch-11', '4a2f5e9c-7b4b-4b27-9f5e-4e8d1f9faa15', 'demo-user-002', 'moderator', 'pitch', 1, 4, NULL, '2026-02-28T17:18:00Z'),
+  ('pr-015', 'pitch-11', '1e9c2d7a-4c8f-4e27-8a1f-7a9b1c2caa17', 'demo-user-002', 'moderator', 'pitch', 1, 5, NULL, '2026-02-28T17:18:00Z'),
+  ('pr-016', 'pitch-11', '3d0e3c9a-5a61-4a55-8a8e-4d6b5a9eaa15', 'demo-user-002', 'moderator', 'pitch', 1, 4, NULL, '2026-02-28T17:18:00Z'),
+  ('pr-017', 'pitch-11', '2b6c0b5b-0a1f-4b5d-b5a4-4bd7e9a9aa10', 'demo-user-002', 'moderator', 'pitch', 1, 5, NULL, '2026-02-28T17:18:00Z'),
+  ('pr-018', 'pitch-11', '0b7a9c2d-6d3e-4c2a-9a1f-3b7c9d1daa18', 'demo-user-002', 'moderator', 'pitch', 1, 4, NULL, '2026-02-28T17:18:00Z');
 
 --------------------------------------------------------------------------------
 -- 7. EVENT REGISTRATIONS (some demo registrations)
@@ -166,3 +222,123 @@ INSERT INTO event_registrations (registration_id, event_id, user_id, in_presence
 
 INSERT INTO event_problem_queue (queue_id, event_id, problem_id, queue_state, position_index, added_at, updated_at) VALUES
   ('epq-001', 'event-feb-2026', 'prob-rag-001', 'selected_for_pitch', 1, '2026-02-01T10:00:00Z', '2026-02-01T10:00:00Z');
+
+--------------------------------------------------------------------------------
+-- 9. EMAIL TEMPLATE (V1 default for demo event)
+--------------------------------------------------------------------------------
+
+INSERT INTO event_email_templates (template_id, event_id, version, subject, body_markdown, created_at, created_by_user_id, is_current) VALUES
+  ('tmpl-001', 'event-feb-2026', 1,
+   'Reminder: VibeCoding Cologne February 2026 starts soon!',
+   'Hi {{display_name}},
+
+This is a reminder that **VibeCoding Cologne February 2026** is starting soon.
+
+**When:** February 28, 2026 at 17:00
+**Where:** STARTPLATZ Cologne, Im Mediapark 5, 50670 Köln
+
+We look forward to seeing you there!
+
+Best,
+The VibeCoding Team',
+   '2026-02-01T12:00:00Z', 'demo-user-002', 1);
+
+--------------------------------------------------------------------------------
+-- 10. LESSONS LEARNED (Ch.4.2, Ch.19.3.29, TICKET-15)
+-- Demo lessons across problems to populate the Knowledge Base
+--------------------------------------------------------------------------------
+
+INSERT INTO lessons_learned (lesson_id, problem_id, event_id, user_id, content, category, tags, valuable, created_at) VALUES
+  ('lesson-001', 'prob-rag-001', 'event-feb-2026', 'demo-user-001', 'Using DSPy-style optimization for prompt tuning reduced iteration time by 40%. Key insight: treat prompts as optimizable artifacts, not magic strings you fiddle with manually.', 'architecture', '["prompting","optimization","dspy"]', 1, '2026-03-01T09:15:00Z'),
+  ('lesson-002', 'prob-rag-001', 'event-feb-2026', 'demo-user-003', 'RAG with SQLite FTS5 is surprisingly capable for small-to-medium datasets. No need for a vector database if your corpus fits in a single file and you only need keyword retrieval.', 'tooling', '["rag","sqlite","fts5"]', 1, '2026-03-01T10:30:00Z'),
+  ('lesson-003', 'prob-rag-001', 'event-feb-2026', 'demo-user-004', 'Always open the test file in a separate editor tab when prompting Claude Code for TDD. Claude performs significantly better when the test file is visible in context.', 'process', '["claude","tdd","workflow"]', 0, '2026-03-02T14:00:00Z'),
+  ('lesson-004', 'prob-eval-002', NULL, 'demo-user-003', 'Evaluation pipelines need a "fast fail" path. If the first few test cases fail badly, abort early rather than running the full 100-case suite. Saved us 20 minutes per iteration.', 'performance', '["testing","evaluation","early-exit"]', 0, '2026-02-20T11:00:00Z'),
+  ('lesson-005', 'prob-eval-002', NULL, 'demo-user-002', 'Gotcha: Claude Sonnet 4.5 interprets "score 1-5" as inclusive of 0 unless you explicitly state "integer between 1 and 5 inclusive, never 0". Wasted an hour on mysterious 0-scores.', 'gotcha', '["claude","prompt-engineering","scoring"]', 1, '2026-02-21T09:45:00Z'),
+  ('lesson-006', 'prob-dspy-003', NULL, 'demo-user-001', 'When exploring greenfield problems, start with the simplest possible implementation first, then measure. Every premature abstraction we added in hour 1 had to be ripped out in hour 2.', 'process', '["architecture","simplicity","greenfield"]', 0, '2026-02-10T16:30:00Z');
+
+--------------------------------------------------------------------------------
+-- 11. CONTRIBUTION POINTS (Ch.33.6.3, Ch.19.3.35)
+-- Seeded for existing decisions to populate the contributor wall.
+-- All within the 6-week window of today (2026-02-25) to appear on wall.
+-- source_id has no FK constraint — references logical source records.
+--------------------------------------------------------------------------------
+
+INSERT INTO contribution_points (contribution_id, user_id, action_key, points_awarded, source_type, source_id, event_id, awarded_at) VALUES
+  -- Max Mustermann (3 pts): problem submitted twice, elected for pitch
+  ('cp-001', 'demo-user-001', 'problem_submitted', 1, 'decision', 'dec-rag-02', 'event-feb-2026', '2026-01-20T10:30:00Z'),
+  ('cp-002', 'demo-user-001', 'problem_submitted', 1, 'decision', 'dec-rag-05', 'event-feb-2026', '2026-01-28T15:30:00Z'),
+  ('cp-003', 'demo-user-001', 'problem_elected_pitch', 1, 'decision', 'dec-rag-07', 'event-feb-2026', '2026-02-01T10:00:00Z'),
+  -- Tom Weber (1 pt): problem submitted
+  ('cp-004', 'demo-user-003', 'problem_submitted', 1, 'decision', 'dec-eval-02', 'event-feb-2026', '2026-01-25T14:30:00Z'),
+  -- Eva Schmidt (2 pts): review assessments (historical, no event context)
+  ('cp-005', 'demo-user-002', 'review_assessment_completed', 1, 'response', 'resp-historic-01', NULL, '2026-01-15T20:00:00Z'),
+  ('cp-006', 'demo-user-002', 'review_assessment_completed', 1, 'response', 'resp-historic-02', NULL, '2026-01-29T21:00:00Z'),
+  -- Lisa Chen (1 pt): valuable chat contribution
+  ('cp-007', 'demo-user-004', 'valuable_contribution', 1, 'chat_message', 'msg-historic-01', NULL, '2026-02-10T11:00:00Z');
+
+--------------------------------------------------------------------------------
+-- 12. USER MILESTONES (Ch.33.2, Ch.19.3.40)
+-- First-time achievements for demo users based on seeded actions.
+--------------------------------------------------------------------------------
+
+INSERT INTO user_milestones (milestone_id, user_id, milestone_key, achieved_at, context_id, context_type) VALUES
+  -- Max: first submission, first acceptance, first event
+  ('ms-001', 'demo-user-001', 'first_problem_submitted', '2026-01-20T10:30:00Z', 'prob-rag-001', 'problem'),
+  ('ms-002', 'demo-user-001', 'first_problem_accepted', '2026-01-29T11:00:00Z', 'prob-rag-001', 'problem'),
+  ('ms-003', 'demo-user-001', 'first_event_attended', '2026-02-28T17:00:00Z', 'event-feb-2026', 'event'),
+  -- Tom: first submission, first event
+  ('ms-004', 'demo-user-003', 'first_problem_submitted', '2026-01-25T14:30:00Z', 'prob-eval-002', 'problem'),
+  ('ms-005', 'demo-user-003', 'first_event_attended', '2026-02-28T17:00:00Z', 'event-feb-2026', 'event'),
+  -- Eva: first assessment, first event (moderator, long-tenured)
+  ('ms-006', 'demo-user-002', 'first_assessment_completed', '2026-01-15T20:00:00Z', NULL, NULL),
+  ('ms-007', 'demo-user-002', 'first_event_attended', '2026-02-28T17:00:00Z', 'event-feb-2026', 'event'),
+  -- Lisa: first event
+  ('ms-008', 'demo-user-004', 'first_event_attended', '2026-02-28T17:00:00Z', 'event-feb-2026', 'event');
+
+--------------------------------------------------------------------------------
+-- 13. CHAT MESSAGES (Ch.31, TICKET-26)
+-- Demo conversation on RAG problem (v2) with threading
+--------------------------------------------------------------------------------
+
+-- Top-level messages (reply_to_message_id IS NULL)
+INSERT INTO chat_messages (message_id, user_id, problem_id, problem_version_id, major_version, event_id, team_id, context_situation, content, reply_to_message_id, url_disclosed, is_bot, author_role, visible, created_at) VALUES
+  ('chat-001', 'demo-user-001', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Has anyone worked with LlamaIndex''s evaluation framework? I''m trying to decide between their built-in metrics and rolling our own.', NULL, 0, 0, 'developer', 1, '2026-02-20T14:00:00Z'),
+  ('chat-002', 'demo-user-002', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Good question. From the moderator side — whatever you choose, make sure we can reproduce the benchmark results deterministically. That''s key for the review phase.', NULL, 0, 0, 'moderator', 1, '2026-02-20T14:05:00Z'),
+  ('chat-003', 'demo-user-003', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'I found this useful comparison: https://docs.llamaindex.ai/en/stable/module_guides/evaluating/ — covers precision, recall, and faithfulness metrics.', NULL, 1, 0, 'developer', 1, '2026-02-20T14:10:00Z'),
+  ('chat-004', 'demo-user-004', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Just a heads up — I''ll be working on this during the event. Planning to use SQLite FTS5 for the retrieval layer since the corpus is small enough.', NULL, 0, 0, 'developer', 1, '2026-02-21T10:30:00Z'),
+  ('chat-005', 'demo-user-001', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Quick question for everyone: should we standardize on a specific embedding model for the benchmark, or allow any model and compare results?', NULL, 0, 0, 'developer', 1, '2026-02-22T09:00:00Z');
+
+-- Replies to chat-001 (thread with 3 replies)
+INSERT INTO chat_messages (message_id, user_id, problem_id, problem_version_id, major_version, event_id, team_id, context_situation, content, reply_to_message_id, url_disclosed, is_bot, author_role, visible, created_at) VALUES
+  ('chat-006', 'demo-user-003', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'I used LlamaIndex''s evaluation in a previous project. The built-in metrics are solid for a quick start, but you''ll want custom metrics for domain-specific evaluation.', 'chat-001', 0, 0, 'developer', 1, '2026-02-20T14:12:00Z'),
+  ('chat-007', 'demo-user-001', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Thanks @TomWeber — that''s exactly what I was thinking. We could start with their defaults and extend with custom faithfulness scoring.', 'chat-001', 0, 0, 'developer', 1, '2026-02-20T14:15:00Z'),
+  ('chat-008', 'demo-user-004', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Agreed. I''d suggest we use RAGAS as a second validation — it gives slightly different angles on faithfulness and answer relevancy.', 'chat-001', 0, 0, 'developer', 1, '2026-02-20T14:20:00Z');
+
+-- Replies to chat-005 (thread with 2 replies, including a nested reply)
+INSERT INTO chat_messages (message_id, user_id, problem_id, problem_version_id, major_version, event_id, team_id, context_situation, content, reply_to_message_id, url_disclosed, is_bot, author_role, visible, created_at) VALUES
+  ('chat-009', 'demo-user-002', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'I''d say: pick one default (e.g. text-embedding-3-small) but allow overriding via config. That way we have comparable baselines.', 'chat-005', 0, 0, 'moderator', 1, '2026-02-22T09:15:00Z'),
+  ('chat-010', 'demo-user-003', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'Good call. OpenAI''s text-embedding-3-small is a reasonable default — cheap, fast, and well-documented.', 'chat-009', 0, 0, 'developer', 1, '2026-02-22T09:20:00Z');
+
+-- Reply to chat-003 (single reply)
+INSERT INTO chat_messages (message_id, user_id, problem_id, problem_version_id, major_version, event_id, team_id, context_situation, content, reply_to_message_id, url_disclosed, is_bot, author_role, visible, created_at) VALUES
+  ('chat-011', 'demo-user-001', 'prob-rag-001', 'pv-rag-v2', 2, 'event-feb-2026', NULL, 'pre_discussion',
+   'That doc is exactly what I needed. The faithfulness evaluator section is particularly relevant for our use case.', 'chat-003', 0, 0, 'developer', 1, '2026-02-20T14:25:00Z');
+
+-- Chat reactions (to give visual richness)
+INSERT INTO chat_reactions (reaction_id, message_id, user_id, emoji, created_at) VALUES
+  ('react-001', 'chat-003', 'demo-user-001', '👍', '2026-02-20T14:11:00Z'),
+  ('react-002', 'chat-003', 'demo-user-002', '💡', '2026-02-20T14:12:00Z'),
+  ('react-003', 'chat-002', 'demo-user-001', '✅', '2026-02-20T14:06:00Z'),
+  ('react-004', 'chat-004', 'demo-user-001', '🔥', '2026-02-21T10:31:00Z'),
+  ('react-005', 'chat-009', 'demo-user-001', '👍', '2026-02-22T09:16:00Z'),
+  ('react-006', 'chat-009', 'demo-user-003', '👍', '2026-02-22T09:17:00Z');

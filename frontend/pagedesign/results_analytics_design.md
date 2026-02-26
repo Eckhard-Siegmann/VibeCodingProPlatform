@@ -422,6 +422,96 @@ Encourage more participants to complete the assessment.
 
 ---
 
+## CSV Export Button (Admin-Only)
+
+**Spec Reference**: Ch.15.3.4 (Export and Downstream Use), A17
+
+**Visibility**: Only users with `admin` role see the Download CSV button.
+
+**Position**: In the filter/toolbar area, right-aligned, alongside the view toggle.
+
+**Layout**:
+```
+┌──────────────────────────────────────────┐
+│ Filters:                                 │
+│ Role [All ▼] Location [All ▼] [Apply]   │
+│                         [📥 CSV] [Table][Chart] │
+└──────────────────────────────────────────┘
+```
+
+**Behavior**:
+- Click generates CSV **client-side** from the currently displayed filtered data
+- No separate API endpoint required
+- Includes all columns visible in the current filtered view
+- UTF-8 BOM prepended for Excel compatibility
+- Filename: `rating_results_{ISO_date}.csv` (e.g., `rating_results_2026-02-25.csv`)
+
+**CSV Columns**:
+```
+Item,N,Mean,SD,Min,Max
+Correctness,12,4.2,0.8,3,5
+Readability,12,3.8,1.1,2,5
+...
+```
+
+**Button Styling**:
+```
+<Button variant="outline" size="sm">
+  <Download class="w-4 h-4 mr-1" />
+  CSV
+</Button>
+```
+
+**Mobile**: Button in filter bar, same row as view toggle.
+
+---
+
+## Scalable List Considerations (Ch.12.10)
+
+### Per-Item Results Table — Bounded, No Pagination
+
+The ResultsTable displays per-item aggregated statistics. Item count is bounded by the inventory definition (currently 6 core quality dimensions + 2 meta items = 8 items). This is a fixed, small set determined by the inventory structure, not by user data volume.
+
+**No pagination** is needed. The full item set is always loaded and displayed. Even with future inventory expansion, items are expected to remain under 20 — well within a single-page view.
+
+### Contributor Wall / Leaderboard — Explicit Limits
+
+The Contributor Wall (visible on the landing page `/`, specified in `recognition_design.md`) and any per-event leaderboard views display ranked user lists that can grow with the community.
+
+**Limits**:
+- **Landing page Contributor Wall**: `LIMIT 10` (top 10 contributors, last 6 weeks). Already bounded by `getTopContributors(10)`. No pagination — the wall is a curated highlight, not a complete ranking.
+- **Event-level leaderboard** (if displayed in results context): `LIMIT 100` with "Load More" appending 50 more. Server query: `ORDER BY total_points DESC LIMIT ? OFFSET ?`
+- **Community-wide full ranking** (future): Must use the standard scalable list view pattern (Ch.12.10) with `Pagination.svelte`, `SearchBar.svelte`, and `ListFilterBar.svelte` (filter by location, event, time range).
+
+### Historical Event Results Tables — Scalable List View
+
+When displaying results across multiple events (e.g., "How did this problem score at previous events?" or "All events at this location"), the data set is potentially unbounded.
+
+**Pattern**: Standard scalable list view (Ch.12.10):
+- Server-side pagination: 20 rows per page, `Pagination.svelte` for navigation
+- SearchBar: Filter by problem title, event name, or author
+- ListFilterBar: Filter by location, time range, problem type
+- URL state: `?location=cologne&page=2&search=api` for shareable views
+- Sort: By event date (default newest first), or by score
+
+**Data shape** (per row in a historical results table):
+```typescript
+{
+  event_title: string,
+  event_date: string,
+  location_name: string,
+  problem_title: string,
+  assessment_type: 'pitch' | 'review',
+  response_count: number,
+  weighted_average: number,
+  rank: number | null  // null for pitch (no ranking)
+}
+```
+
+**Implementation note**: Historical event tables are a future enhancement beyond MVP scope. This specification ensures the pattern is defined when implementation begins.
+
+---
+
 ## Testing Checklist
 
 - [ ] Page loads with assessment data
@@ -451,10 +541,20 @@ Encourage more participants to complete the assessment.
 - [ ] Mobile: Charts scrollable if wide
 - [ ] Mobile: Table transforms to cards
 - [ ] Desktop: Full table visible
+- [ ] CSV button visible only for admin users
+- [ ] CSV button hidden for non-admin users
+- [ ] CSV download generates valid CSV file
+- [ ] CSV filename follows convention (rating_results_YYYY-MM-DD.csv)
+- [ ] CSV has UTF-8 BOM for Excel compatibility
+- [ ] CSV includes all visible columns from current filtered view
+- [ ] CSV values properly escaped (commas, quotes)
 - [ ] Accessibility: All data announced to screen readers
 
 ---
 
-**Document Version**: 1.0.0
-**Lines**: ~350
+**Document Version**: 1.1.0
+**Lines**: ~400
 **Status**: Complete
+**Changelog**:
+- v1.1.0 (2026-02-25): Added "Scalable List Considerations" section — explicit limits for Contributor Wall/leaderboard (LIMIT 10/100), historical event results table pattern (Ch.12.10 scalable list view), confirmation that per-item results are bounded and need no pagination
+- v1.0.0: Initial specification (CSV export button added for TICKET-23)

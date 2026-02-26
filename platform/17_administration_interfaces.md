@@ -277,6 +277,17 @@ Administrators can view all users with:
 - Newsletter subscription status
 - Events attended
 
+**Scalable list requirements** (see Ch.12.10 for the reusable pattern):
+
+- **Server-side pagination**: Default 20 users per page. Essential — the user list can grow to thousands of entries.
+- **Search**: Real-time search by `display_name` or `email` with 300ms debounce. Server-side `LIKE` query.
+- **Filter by role**: All, Observer, Developer, Moderator, Admin, Agent
+- **Filter by email status**: All, Confirmed, Unconfirmed
+- **Sort**: By display name (A-Z, Z-A), by registration date (newest, oldest), by role
+- **URL state persistence**: All filters/search/page encoded in query parameters
+
+These requirements apply equally to the event management list (`/admin/events`), item list (`/admin/items`), and inventory list (`/admin/inventories`). See Ch.26.17 for the Pagination, SearchBar, and ListFilterBar component specifications.
+
 ### CSV Import
 
 Administrators can bulk-import users from partner-provided lists.
@@ -417,17 +428,31 @@ Moderators award stars for hacking excellence based on review assessment scores.
 
 ### 17.9.1 Star Awards UI
 
-After review assessments close, moderators see an awards panel:
+After review assessments close, moderators see an awards panel on the moderator dashboard. The panel shows all coded problems from the current event with their weighted review scores (see Ch.33.6.4 for the aggregation formula), ranked by score descending.
+
+**MVP** (1 team per problem per event): Rankings are across all coded problems at the event. Each problem has one team; the moderator awards 1st/2nd/3rd to the top-performing problem-solutions. All team members of a winning problem receive the same award.
+
+```
+Star Awards — VibeCoding Cologne Feb 2026
+──────────────────────────────────────────
+
+Review scores (weighted):                          Suggested
+──────────────────────────────────────────         ─────────
+1. "API Rate Limiter" — Team Max (Max, Eva)   4.2  1st
+2. "CLI Parser" — Team Lisa (Lisa, Tom)       3.8  2nd
+3. "Log Analyzer" — Team Anna (Anna)          3.5  3rd
+
+[Confirm Awards] [Adjust Rankings]
+```
+
+**Future** (multi-team per problem): When multiple teams work on the same problem, the panel shows per-problem rankings instead:
 
 ```
 Star Awards: "API Rate Limiter" (VibeCoding Cologne Feb 2026)
 ──────────────────────────────────────────────────────────────
-
-Review scores (weighted):
-────────────────────────
-1. Team Max (Max, Eva)        Score: 4.2 ⭐⭐⭐ Suggested: 1st place
-2. Team Lisa (Lisa, Tom)      Score: 3.8 ⭐⭐   Suggested: 2nd place
-3. Team Anna (Anna)           Score: 3.5 ⭐     Suggested: 3rd place
+1. Team Max (Max, Eva)        Score: 4.2  Suggested: 1st place
+2. Team Lisa (Lisa, Tom)      Score: 3.8  Suggested: 2nd place
+3. Team Anna (Anna)           Score: 3.5  Suggested: 3rd place
 
 [Confirm Awards] [Adjust Rankings]
 ```
@@ -453,24 +478,99 @@ Review scores (weighted):
 
 Administrators can configure point weights for the contributor recognition system.
 
-**Point Actions and Weights**: See Chapter 19.3.32 (`contribution_action_catalog`) for the complete point-earning action list and Chapter 33.6.3 for the scoring model. Default: 1 point per action (review completion, valuable contributions, problem submission, selection for pitch/coding).
+**Point Actions and Weights**: See Chapter 19.3.34 (`contribution_action_catalog`) for the complete point-earning action list and Chapter 33.6.3 for the scoring model. Default: 1 point per action (review completion, valuable contributions, problem submission, selection for pitch/coding).
 
-**Review Weights for Star Calculation**: See Chapter 19.3.35 (`review_weight_catalog`) and Chapter 33.6.4 for the complete weighting system. Defaults: live reviews 1.0x, post-event reviews 1.5x, agent reviews 0.5x.
+**Review Weights for Star Calculation**: See Chapter 19.3.37 (`review_weight_catalog`) and Chapter 33.6.4 for the complete weighting system. Defaults: live reviews 1.0x, post-event reviews 1.5x, agent reviews 0.5x.
 
 The admin UI allows adjusting `current_points` values for each action and review weight multipliers without schema changes.
 
 ---
 
-## 17.10 Relationship to Other Chapters
+## 17.10 Catalog and Weight Management
+
+### Purpose
+
+The system uses numerous catalog tables (controlled vocabularies) to classify entities. Most catalogs are **structural constants** that drive state machines, authorization logic, or assessment lifecycles and must only change through the spec-first pipeline. However, a subset of catalogs are **soft classifications** or **tunable weights** that administrators may safely manage at runtime without coordinated spec, seed data, or frontend constant updates.
+
+### Admin-Tunable Catalog Classification
+
+**Soft catalogs** — classification vocabularies with no state-machine implications:
+
+| Catalog Table | What It Classifies |
+|--------------|-------------------|
+| `problem_type_catalog` | Problem classification types (explorative, greenfield, etc.) |
+| `emoji_catalog` | Curated reaction emoji set |
+| `lesson_category_catalog` | Lesson learned categories (tooling, architecture, etc.) |
+
+**Weight catalogs** — configurable scoring parameters:
+
+| Catalog Table | What It Tunes |
+|--------------|--------------|
+| `contribution_action_catalog` | Point-earning action weights (`current_points`) |
+| `review_weight_catalog` | Review context multipliers (`weight_multiplier`) |
+
+**Structural catalogs** — NOT admin-manageable (require coordinated spec+seed+frontend changes):
+
+`readiness_state_catalog`, `action_state_catalog`, `decision_type_catalog`, `time_context_catalog`, `user_role_catalog`, `auth_provider_catalog`, `team_member_role_catalog`, `team_member_status_catalog`, `queue_state_catalog`, `chat_context_catalog`, `resource_type_catalog`, `partner_type_catalog`, `milestone_key_catalog`, `hint_key_catalog`.
+
+### Operations
+
+**Soft catalogs** support the following operations:
+
+- **Add new entry**: Provide key, display_name, description, sort_order. Key must be unique, lowercase, underscores only.
+- **Edit entry**: Update display_name, description, sort_order. The primary key is immutable.
+- **Toggle active/inactive**: Set `is_active` to false to prevent new usage. Deactivated entries remain in the database and preserve all historical references. Reactivation is permitted.
+- **No delete**: Entries are never deleted. Foreign key references from existing data (problems, reactions, lessons) must be preserved.
+
+**Weight catalogs** additionally support:
+
+- **Edit weight**: For `contribution_action_catalog`, edit `current_points` (integer). The `default_points` column is preserved as an audit baseline. For `review_weight_catalog`, edit `weight_multiplier` (decimal). Changes take effect for future calculations only; existing `contribution_points` snapshots are not retroactively adjusted.
+
+### Catalog Management UI
+
+**Route**: `/admin/catalogs`
+
+The Catalog Management page presents a **tabbed interface** with one tab per manageable catalog:
+
+1. **Problem Types** — `problem_type_catalog`
+2. **Emojis** — `emoji_catalog`
+3. **Lesson Categories** — `lesson_category_catalog`
+4. **Contribution Weights** — `contribution_action_catalog`
+5. **Review Weights** — `review_weight_catalog`
+
+**Desktop** (≥768px): Standard horizontal tab bar with table list below.
+**Mobile** (<768px): Horizontal scrollable pill tabs; entries displayed as cards.
+
+Each tab shows all entries (active first, inactive grayed out) with:
+
+- Entry key / emoji
+- Display name
+- Description (if present)
+- Active/inactive status badge
+- Action buttons: Edit, Toggle Active
+
+For weight catalogs, the current weight value is displayed inline with an editable input field and a Save button.
+
+### Constraints
+
+- Adding a new entry requires admin role.
+- Deactivating a catalog entry that is actively referenced (e.g., an emoji used in existing reactions) does not remove historical data — it only prevents new usage.
+- The emoji catalog primary key is the emoji character itself (Unicode). New emojis must be valid Unicode emoji sequences.
+- Sort order determines display order in dropdowns and pickers throughout the platform.
+
+---
+
+## 17.11 Relationship to Other Chapters
 
 - The **data structures underlying Items and Inventories** are defined in Chapter 7.
 - The **Decision logging model** referenced by administrative actions is specified in Chapter 10.
 - The **Moderator-facing operational dashboards** are specified in Chapter 12.
 - The **statistical presentation and aggregation** are discussed in Chapter 15.
-- The **persistence model** is specified in Chapter 19.
+- The **persistence model** (including catalog table definitions) is specified in Chapter 19.
 - The **events, partners, and locations model** is specified in Chapter 29.
 - The **registration and CSV import** is specified in Chapter 30.
-- The **contributor recognition system** is specified in Chapter 33.
+- The **contributor recognition system** (points and stars) is specified in Chapter 33.
 - The **onboarding for first-time moderators** is specified in Chapter 32.
+- The **catalog admin-tunability classification** is cross-referenced in Chapter 19.2.
 
 Administration Interfaces are deliberately simple—but they govern the semantic integrity of the entire system. Their correctness matters more than any other UI in the platform.

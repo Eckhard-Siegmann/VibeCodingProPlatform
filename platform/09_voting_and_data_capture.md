@@ -156,6 +156,16 @@ This orthogonal design ensures that:
 - Complex filters and contrasts are possible without data duplication.
 - The system remains extensible for future research and tooling.
 
+### 9.5.5 Review Weight Context
+
+For **review assessments**, each response carries an additional `review_weight_key` (FK to `review_weight_catalog`, Chapter 19.3.37) that determines the multiplier applied during star award calculations (Chapter 33.6.4). The weight is assigned server-side at insertion time based on the response's time context and role:
+
+- `time_context = 'review'` → `live_review` (1.0x)
+- `time_context = 'post_event'` or `'late_reflection'` → `post_event_review` (1.5x)
+- `role = 'agent'` (overrides time context) → `agent_review` (0.5x)
+
+For non-review assessments (pitch, self-assessment), `review_weight_key` is `NULL`. See Chapter 14.2 for the complete review weight assignment specification.
+
 ---
 
 Together, the mechanisms described in this chapter ensure that response data is **precise, minimal, interpretable, and analytically powerful**, forming a solid empirical foundation for everything built on top of it.

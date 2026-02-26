@@ -6,6 +6,7 @@ import {
     MODE_CLOSE_DECISION,
     type DecisionTypeKey
 } from '$lib/constants/decisions';
+import { awardContributionPoints, checkAndAwardMilestone } from './recognition';
 
 export interface LiveContext {
     event_id: string;
@@ -128,6 +129,21 @@ function checkAndCloseExpiredTimer(eventId: string): boolean {
     });
 
     return result.success;
+}
+
+/**
+ * Extend or update the live timer (moderator action, non-binding).
+ * No decision recorded — timer management is operational (Ch.14 §14.5.1).
+ */
+export function extendTimer(eventId: string, timerEndsAt: string): void {
+    const db = getDatabase();
+    const now = nowIso();
+
+    db.prepare(`
+        UPDATE event_live_context
+        SET timer_ends_at = ?, updated_at = ?
+        WHERE event_id = ? AND current_mode != 'idle'
+    `).run(timerEndsAt, now, eventId);
 }
 
 export function recordDecision(params: RecordDecisionParams): RecordDecisionResult {
@@ -273,6 +289,43 @@ export function recordDecision(params: RecordDecisionParams): RecordDecisionResu
                 updateQueueState(params.eventId, params.problemId, 'completed');
             } else if (params.decisionType === 'selected_for_coding') {
                 updateQueueState(params.eventId, params.problemId, 'selected_for_coding');
+            }
+
+            // 11. Contribution points (Ch.33.6.3, reactive trigger per spec)
+            // problem_submitted: award points to the PO who submitted
+            if (params.decisionType === 'problem_submitted') {
+                awardContributionPoints(
+                    params.actorUserId, 'problem_submitted', 'decision', decisionId, params.eventId
+                );
+                checkAndAwardMilestone(params.actorUserId, 'first_problem_submitted', params.problemId, 'problem');
+            }
+            // quality_gate_accepted: milestone for PO (first problem accepted)
+            if (params.decisionType === 'quality_gate_accepted') {
+                const owner = db.prepare('SELECT created_by_user_id FROM problems WHERE problem_id = ?')
+                    .get(params.problemId) as { created_by_user_id: string } | undefined;
+                if (owner) {
+                    checkAndAwardMilestone(owner.created_by_user_id, 'first_problem_accepted', params.problemId, 'problem');
+                }
+            }
+            // selected_for_event: award problem_elected_pitch to the problem owner
+            if (params.decisionType === 'selected_for_event') {
+                const owner = db.prepare('SELECT created_by_user_id FROM problems WHERE problem_id = ?')
+                    .get(params.problemId) as { created_by_user_id: string } | undefined;
+                if (owner) {
+                    awardContributionPoints(
+                        owner.created_by_user_id, 'problem_elected_pitch', 'decision', decisionId, params.eventId
+                    );
+                }
+            }
+            // selected_for_coding: award problem_elected_coding to the problem owner
+            if (params.decisionType === 'selected_for_coding') {
+                const owner = db.prepare('SELECT created_by_user_id FROM problems WHERE problem_id = ?')
+                    .get(params.problemId) as { created_by_user_id: string } | undefined;
+                if (owner) {
+                    awardContributionPoints(
+                        owner.created_by_user_id, 'problem_elected_coding', 'decision', decisionId, params.eventId
+                    );
+                }
             }
 
             return {

@@ -1,6 +1,14 @@
 import { z } from 'zod';
 
-export const RoleSchema = z.enum(['problem_owner', 'developer', 'observer']);
+export const RoleSchema = z.enum([
+	'observer',
+	'developer',
+	'coding_partner',
+	'problem_owner',
+	'moderator',
+	'admin',
+	'agent'
+]);
 export type Role = z.infer<typeof RoleSchema>;
 
 export const TimeContextSchema = z.enum([
@@ -14,11 +22,11 @@ export type TimeContext = z.infer<typeof TimeContextSchema>;
 
 export const ResponseItemSchema = z.object({
 	item_id: z.string().uuid(),
-	rating_value: z.number().int().min(1).max(5) // Unified 5-point scale per Ch.7.3
+	rating_value: z.number().int().min(1).max(10) // Items use max_rating 5 or 10 (e.g. cognitive_ease)
 });
 
 export const SubmitResponsesSchema = z.object({
-	session_hash: z.string().min(8), // Relaxed for dev (fallback hashes are shorter)
+	session_hash: z.string().min(8).optional(), // Deprecated: identity now from session cookie
 	role: RoleSchema,
 	time_context: TimeContextSchema,
 	in_presence: z.boolean(),
@@ -58,6 +66,7 @@ export const RenderStructureSchema = z.object({
 	major_version: z.number().int().nullable(),
 	time_context: TimeContextSchema,
 	is_open: z.boolean(),
+	timer_ends_at: z.string().nullable(),
 	render_type: z.enum(['single_matrix', 'mixed_matrices']),
 	matrix: MatrixSchema
 });

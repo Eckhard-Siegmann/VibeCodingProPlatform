@@ -1,11 +1,7 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { findProblemById, getCurrentVersion } from '$lib/server/repositories/problems';
-import {
-	getChatMessages,
-	postChatMessage,
-	getAvailableEmojis
-} from '$lib/server/repositories/chat';
+import { getChatMessages, postChatMessage, getAvailableEmojis } from '$lib/server/repositories/chat';
 import { getEffectiveRole, getTeam } from '$lib/server/repositories/teams';
 import { getAuthenticatedUser } from '$lib/server/auth';
 import { z } from 'zod';
@@ -80,6 +76,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
 const PostMessageSchema = z.object({
 	content: z.string().min(1).max(2000),
 	reply_to_message_id: z.string().uuid().optional(),
+	event_id: z.string().optional(),
 	context_situation: z.enum(['pre_discussion', 'pitch_discussion', 'while_building', 'while_reviewing']).optional()
 });
 
@@ -108,7 +105,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		body = PostMessageSchema.parse(rawBody);
 	} catch (err) {
 		if (err instanceof z.ZodError) {
-			throw error(400, `Validation error: ${err.errors.map(e => e.message).join(', ')}`);
+			throw error(400, `Validation error: ${err.issues.map((e: z.ZodIssue) => e.message).join(', ')}`);
 		}
 		throw error(400, 'Invalid request body');
 	}
@@ -119,9 +116,14 @@ export const POST: RequestHandler = async ({ params, request }) => {
 	// Determine context situation (default based on problem state or passed value)
 	const contextSituation = body.context_situation ?? 'pre_discussion';
 
-	// Get team if exists (for team_id on message)
-	// MVP: No event context, so team lookup is simplified
-	const teamId: string | null = null; // TODO: Get from event context when available
+	// Resolve event_id and team_id from context
+	const eventId = body.event_id ?? null;
+	let teamId: string | null = null;
+
+	if (eventId) {
+		const team = getTeam(problemId, eventId);
+		teamId = team?.team_id ?? null;
+	}
 
 	try {
 		const result = postChatMessage({
@@ -130,8 +132,8 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			problemId: problemId,
 			problemVersionId: currentVersion.problem_version_id,
 			majorVersion: currentVersion.major_version,
-			minorVersion: null, // TODO: Get from repo snapshot if available
-			eventId: null, // TODO: Get from event context
+			minorVersion: null,
+			eventId: eventId,
 			teamId: teamId,
 			contextSituation: contextSituation,
 			content: body.content,

@@ -270,32 +270,51 @@ A persistent panel (or expandable section) visible only to Moderators.
 - Open/Close buttons for pitch and review phases
 - Timer controls (set duration, extend time)
 
-**Event Planning View**
-- Full list of Problems with extended metadata
-- Advanced filtering:
-  - By event
-  - By location
-  - By readiness state (`draft`, `submitted`, `needs_changes`, `ready`, `rejected`)
-  - By action state (`backlog`, `selected_for_event`, `selected_for_coding`, `deferred`, `dropped`, `closed`)
-  - By decision history
-- Sorting by creation date, last decision, or priority
+**Event Planning View** (Sub-Page: `/dashboard/moderator/queue/{eventId}`)
 
-This view supports **pre-event curation** and **in-event reprioritization**.
+A dedicated queue planning page accessible from the moderator dashboard. This view supports **pre-event curation** — the workflow of selecting `ready` problems from the backlog and adding them to the event queue.
+
+The Event Planning View uses a **dual-pane shuttle pattern** (analogous to the Inventory Editor in Ch.17/26.12.2):
+- **Left pane**: "Available Problems" — problems where `readiness = ready AND action = backlog`, eligible for event selection
+- **Right pane**: "Event Queue" — problems already selected for the event, ordered by `position_index`
+
+Moderators can:
+- Move problems from the backlog to the event queue (fires `selected_for_event` decision)
+- Remove problems from the queue (fires `deselected_for_event` decision)
+- Reorder problems within the queue (PATCH `/api/events/{eventId}/queue`)
+
+The view also supports advanced filtering on the backlog pane, using the scalable list view components (§12.10):
+- `SearchBar` for searching by problem title and owner name (300ms debounce, `COLLATE NOCASE`)
+- `ListFilterBar` for filtering by problem type
+- "Load More" append-style pagination (20 problems per batch) for the Available Problems pane, which can contain 50–200 ready problems
+- Sorting by creation date (default newest first)
+
+The Event Planning View is linked from the moderator dashboard via a prominent "Plan Event Queue" button. See `frontend/pagedesign/queue_planning_design.md` for the full UI specification.
 
 **Live Decision Execution**
 - Moderators can execute decisions with a single click
 - Decisions are immediately logged and reflected across all views
 - Optional rationale field appears contextually when required (e.g. rejections)
 
+**Pending Review Backlog**
+- Lists all problems with `readiness_state = 'submitted'`, sorted by `submitted_at` (oldest first — FIFO queue)
+- At scale (200+ pending problems across the multi-location community), uses "Load More" append-style pagination (10 problems per batch) per §12.10 Scalable List Views
+- Optional `ListFilterBar` for filtering by problem type and urgency (age since submission)
+- Urgency color-coding: >7 days red, 3–7 days yellow, <3 days normal
+- See `frontend/pagedesign/moderator_dashboard_design.md` for the full UI specification
+
 **Activity Log Shortcut**
 - Compact feed of recent Decisions and Chat activity
+- Uses "Load More" append-style pagination (10 items initially, append 10 more per click, max 50 items)
 - Each entry links directly to the relevant Problem Card
 - Designed to replace ad-hoc messaging tools for internal coordination
 
 **Attendance Tracking** (during/after event)
 - Mark attendance for show-up rate tracking
-- View registration list
-- Export attendance data
+- View registration list — uses `SearchBar` for name/email search and `ListFilterBar` for mode/status filtering (see §12.10 Scalable List Views)
+- For events with 50+ registrants: "Load More" append-style pagination (50 per batch), sorted alphabetically
+- Show-up rate statistics calculated from full dataset (not just visible page)
+- Export attendance data (exports ALL attendees regardless of current filter/pagination)
 
 **Learnings from Last Event** (Cross-Location Panel)
 
@@ -473,13 +492,458 @@ They ensure that complex, agentic, and human-centered workflows remain navigable
 
 ---
 
-## 12.7 Search and Discoverability [LOW PRIORITY]
+## 12.7 Global Navigation Architecture
+
+**Added 2026-02-25**: The platform uses an **"App-Like" Split Navigation** pattern that separates identity/account actions from main app navigation. This eliminates layered hamburger menus and provides always-visible, single-tap route switching.
+
+### 12.7.1 Design Philosophy
+
+The navigation architecture addresses three mobile UX problems:
+
+1. **Hidden menus**: Hamburger menus bury primary routes behind multiple taps, increasing cognitive load
+2. **Conflated concerns**: Mixing "Where do I go?" with "Who am I?" in one menu creates confusion
+3. **Lost orientation**: Without persistent route indicators, users lose context during live events
+
+**Solution**: Two distinct chrome elements with orthogonal responsibilities:
+
+| Element | Position | Purpose | Contains |
+|---------|----------|---------|----------|
+| **Top App Bar** | Fixed top | "Who am I?" — Identity & session | Brand + User Avatar |
+| **Bottom Navigation Bar** | Fixed bottom | "Where do I go?" — App routes | 3-5 primary screens |
+
+### 12.7.2 Top App Bar
+
+A thin, persistent header providing platform identity and user session controls.
+
+**Left side**: Platform logo or brand name ("VibeCoding")
+**Right side**: Logged-in user symbol (initial-based avatar circle, see Ch.26.11.16)
+
+**Avatar tap behavior**: Opens a single-level dropdown or bottom sheet (mobile) containing only account-related actions:
+- Profile / Settings
+- Logout
+- (Future: Notification preferences)
+
+**Visibility**: Present on **all authenticated pages**. Hidden on the public landing page (which has its own hero layout).
+
+**Vertical stacking**: The Top App Bar sits **above** the Live Banner (see dashboard sections 12.3-12.5). Both are sticky, creating a clear visual hierarchy:
+
+```
+┌─────────────────────────────────────┐  ← Top App Bar (sticky, z-50)
+│ VibeCoding              [EH]       │     Brand + Avatar
+├─────────────────────────────────────┤  ← Live Banner (sticky, z-40)
+│ 🔴 LIVE: Pitching 'API Rate Lim…' │     Event state
+├─────────────────────────────────────┤
+│                                     │
+│         Page Content                │  ← Scrollable content
+│         (Dashboard, Problem Card,   │
+│          Assessment, etc.)          │
+│                                     │
+├─────────────────────────────────────┤  ← Bottom Nav Bar (fixed, z-50)
+│  🏠 Home   📅 Events   📋 Problems │     Primary routes
+└─────────────────────────────────────┘
+```
+
+### 12.7.3 Bottom Navigation Bar
+
+A fixed bar at the viewport bottom providing single-tap access to primary screens.
+
+**Route items** (3-5 icons with labels):
+
+| Icon | Label | Route | Description |
+|------|-------|-------|-------------|
+| 🏠 | Home | `/dashboard` | Participant dashboard (default) |
+| 📅 | Events | `/events` | Browse upcoming and past events |
+| 📋 | Problems | `/problems` | Browse all public problems |
+
+**Additional items for moderators/admins** (up to 5 total):
+
+| Icon | Label | Route | Condition |
+|------|-------|-------|-----------|
+| 🎛️ | Moderate | `/dashboard/moderator` | `role ∈ {moderator, admin}` |
+| ⚙️ | Admin | `/admin` | `role = admin` |
+
+**Active state indicator**: The currently active route is visually highlighted (filled icon + accent color). Inactive items use muted icon + label color.
+
+**Interaction model**: Single tap navigates immediately. No sub-menus, no long-press behavior.
+
+### 12.7.4 Responsive Behavior
+
+| Viewport | Top App Bar | Bottom Nav Bar |
+|----------|-------------|----------------|
+| Mobile (<640px) | Compact (44px height), logo text only | Full-width, 56px height, icons + labels stacked vertically |
+| Tablet (640-1023px) | Standard (48px height), logo + tagline | Same as mobile |
+| Desktop (≥1024px) | Standard (48px height), logo + tagline | Optional — may convert to left sidebar or top nav tabs (Future) |
+
+**MVP**: Bottom navigation bar is present on all viewport sizes for consistency. Desktop sidebar conversion is a future enhancement.
+
+### 12.7.5 Visibility Rules
+
+| Page | Top App Bar | Bottom Nav Bar |
+|------|-------------|----------------|
+| Landing page (`/`) | Hidden | Hidden |
+| Login / Register | Hidden | Hidden |
+| All authenticated pages | Visible | Visible |
+
+The landing page and authentication pages are "full-bleed" experiences with their own navigation (hero CTAs, login forms). The global chrome appears only after authentication.
+
+### 12.7.6 Relationship to Existing Navigation
+
+The global navigation chrome **complements** existing in-page navigation:
+
+- **BackButton** (Ch.26.11.17): Still used for hierarchical back-navigation within flows (Assessment → Problem Card)
+- **VersionNav** (Ch.13.5): Version switching remains within the Problem Card
+- **FilterBar / FilterBottomSheet** (Ch.26.11.18): Content filters remain page-specific
+- **Live Banner** (Ch.12.3-12.5): Stacks below Top App Bar, provides event-context navigation
+
+The Bottom Nav Bar provides **lateral** navigation (switching between sibling screens), while BackButton provides **hierarchical** navigation (returning to parent context). Both coexist.
+
+---
+
+## 12.8 Problem Backlog Page
+
+**Added 2026-02-25**: The Problem Backlog Page provides a dedicated browsing surface for all authenticated users to discover and explore problems across the community. This page is the target of the "Problems" item in the Bottom Navigation Bar (§12.7.3).
+
+### Purpose
+
+- Enable authenticated users to browse all publicly visible problems
+- Provide filtering and sorting for efficient discovery
+- Support moderator workflows for backlog curation
+- Serve as the entry point for problem selection and event planning
+
+### Route
+
+`/problems` (plural) — distinct from `/problem/[slug]` (singular) for individual Problem Cards.
+
+### 12.8.1 Visibility Rules (Public Problem Definition)
+
+A problem appears on the public backlog when its states satisfy **both** of the following conditions:
+
+| Dimension | Visible States | Hidden States |
+|-----------|---------------|---------------|
+| **Readiness** | submitted, needs_changes, ready | draft, rejected |
+| **Action** | backlog, selected_for_event, selected_for_coding, deferred, closed | dropped |
+
+**Rationale**:
+- `draft` problems are private works-in-progress
+- `rejected` problems failed the quality gate and should not be promoted
+- `dropped` problems were explicitly removed from consideration
+- `deferred` and `closed` problems remain visible for historical context and cross-event continuity
+
+**Moderator override**: Moderators see additional filter options to reveal hidden states (rejected, dropped) for curation and audit purposes.
+
+### 12.8.2 Core Layout
+
+```
+┌─────────────────────────────────────────────────┐
+│ Problems                            [🔍 Search] │
+├─────────────────────────────────────────────────┤
+│ Filters: [All States ▼] [All Types ▼] [Sort ▼] │
+├─────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────┐ │
+│ │ [Greenfield]  API Rate Limiter              │ │
+│ │ Max Mustermann · Ready · Backlog            │ │
+│ │ "Implement a token bucket rate limiter..."  │ │
+│ │ ⭐⭐ · 3 reviews · v2                       │ │
+│ └─────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ [Explorative]  DSPy Pipeline Optimization   │ │
+│ │ Lisa Chen · Submitted · Selected for Event  │ │
+│ │ "Optimize a DSPy evaluation pipeline..."    │ │
+│ │ v1 · Cologne Feb 2026                       │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│            [Load More] or pagination            │
+└─────────────────────────────────────────────────┘
+```
+
+### 12.8.3 Problem List Item
+
+Each problem in the list displays:
+
+| Element | Description |
+|---------|-------------|
+| **Classification badge** | Problem type (Greenfield, Brownfield, etc.) — top-left, `size="sm"` |
+| **Title** | Problem title, linked to `/problem/[slug]` |
+| **Owner** | Problem owner display name |
+| **Readiness state** | Badge (submitted, needs_changes, ready) |
+| **Action state** | Badge (backlog, selected_for_event, etc.) |
+| **Description excerpt** | First 120 characters of the current version's description |
+| **Stars** | Star count (if any) |
+| **Review count** | Number of completed reviews |
+| **Version** | Current version number |
+| **Event association** | If selected for an event, show event name |
+
+### 12.8.4 Filters
+
+| Filter | Options | Default |
+|--------|---------|---------|
+| **Readiness State** | All, Submitted, Needs Changes, Ready | All |
+| **Action State** | All, Backlog, Selected for Event, Selected for Coding, Deferred, Closed | All |
+| **Problem Type** | All, + all active `problem_type_catalog` entries | All |
+| **Location** | All, Cologne, Aachen, ... (from events associated with problems) | All |
+| **Sort** | Newest First, Oldest First, Most Reviewed, Alphabetical | Newest First |
+
+**Moderator-only filters** (visible when `role ∈ {moderator, admin}`):
+
+| Filter | Additional Options |
+|--------|-------------------|
+| **Readiness State** | + Draft, Rejected |
+| **Action State** | + Dropped |
+
+### 12.8.5 Search
+
+Keyword search across problem title, description, and owner display name. Server-side `LIKE` query with debouncing (300ms). Results update the list in place, preserving active filters.
+
+### 12.8.6 Pagination
+
+Server-side pagination with configurable page size (default: 20 problems per page). See §12.10 for the reusable pagination pattern.
+
+### 12.8.7 Mobile Layout
+
+On viewports <768px:
+
+- Filters collapse into a horizontal scrollable pill bar or a "Filters" button opening a bottom sheet (see Ch.26.11.18 FilterBottomSheet)
+- Problem cards are full-width with stacked metadata
+- Search bar is full-width below the page title
+
+### 12.8.8 Empty States
+
+| Condition | Message |
+|-----------|---------|
+| No problems match filters | "No problems match your current filters. Try adjusting your search or filters." |
+| No problems exist | "No problems have been submitted yet. Be the first to create one!" with link to `/problem/new` |
+
+### 12.8.9 Interaction
+
+- Clicking a problem card navigates to `/problem/[slug]`
+- All filters and search update URL query parameters for shareability (e.g., `/problems?readiness=ready&type=greenfield&sort=newest`)
+- Browser back button returns to the previously filtered state
+
+---
+
+## 12.9 Events Listing Page
+
+**Added 2026-02-25**: The Events Listing Page provides a dedicated browsing surface for all authenticated users to discover upcoming, active, and past events across all locations. This page is the target of the "Events" item in the Bottom Navigation Bar (§12.7.3).
+
+### Purpose
+
+- Enable authenticated users to browse all community events
+- Provide temporal grouping (upcoming, active, past) for orientation
+- Support event registration directly from the listing
+- Surface cross-location activity
+
+### Route
+
+`/events` (plural) — distinct from `/event/[slug]` (singular) for individual Event Detail Pages (§12.2).
+
+### 12.9.1 Core Layout
+
+```
+┌─────────────────────────────────────────────────┐
+│ Events                              [🔍 Search] │
+├─────────────────────────────────────────────────┤
+│ Filters: [All Locations ▼] [All Time ▼]        │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│ ── Active Now ──────────────────────────────── │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ 🔴 VibeCoding Cologne Feb 2026             │ │
+│ │ Feb 25, 2026 · STARTPLATZ · 18 registered  │ │
+│ │ Currently: Pitching                         │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ ── Upcoming ────────────────────────────────── │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ VibeCoding Aachen Mar 2026                  │ │
+│ │ Mar 15, 2026 · RWTH · 12 registered        │ │
+│ │ [Register]                                  │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ ── Past ────────────────────────────────────── │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ VibeCoding Cologne Jan 2026                 │ │
+│ │ Jan 28, 2026 · STARTPLATZ · 23 attended     │ │
+│ │ 5 problems · 3 reviews completed            │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│            [Load More Past Events]              │
+└─────────────────────────────────────────────────┘
+```
+
+### 12.9.2 Event List Item
+
+| Element | Description |
+|---------|-------------|
+| **Title** | Event title, linked to `/event/[slug]` |
+| **Live indicator** | 🔴 badge if event is currently active |
+| **Date** | Formatted date and time |
+| **Location** | City and venue name |
+| **Partner logo** | Small logo (24px) if available |
+| **Registration count** | "N registered" with capacity context (Ch.29) |
+| **Current phase** | For active events: current live mode (Pitching, Review, etc.) |
+| **Summary stats** | For past events: problem count, review count, attendance |
+| **Registration button** | For upcoming events: "Register" / "Registered ✓" / "Waitlist" |
+
+### 12.9.3 Temporal Sections
+
+Events are grouped into three sections, each sorted appropriately:
+
+| Section | Filter Condition | Sort Order | Default State |
+|---------|-----------------|------------|---------------|
+| **Active Now** | `start_time ≤ now AND end_time ≥ now` | By start time (ascending) | Expanded, prominently styled |
+| **Upcoming** | `start_time > now` | By start time (ascending, nearest first) | Expanded |
+| **Past** | `end_time < now` | By start time (descending, most recent first) | Show first 5, then "Load More" |
+
+### 12.9.4 Filters
+
+| Filter | Options | Default |
+|--------|---------|---------|
+| **Location** | All, Cologne, Aachen, ... (from `locations` table) | All |
+| **Time Range** | All, Next 3 Months, Last 6 Months, This Year | All |
+
+### 12.9.5 Search
+
+Keyword search across event title, description, location name, and partner name. Same debounced server-side pattern as Problem Backlog (§12.8.5).
+
+### 12.9.6 Pagination
+
+Past events use **append-style "Load More"** pagination since the temporal grouping makes traditional page numbers less intuitive. Default: 5 past events initially, load 10 more per click.
+
+### 12.9.7 Mobile Layout
+
+On viewports <768px:
+
+- Event cards are full-width
+- Location filter as horizontal pill bar
+- Temporal section headers are sticky during scroll
+
+### 12.9.8 Empty States
+
+| Condition | Message |
+|-----------|---------|
+| No upcoming events | "No upcoming events scheduled yet. Check back soon!" |
+| No past events | "This community is just getting started. Stay tuned for the first event!" |
+| No events match filters | "No events match your current filters." |
+
+### 12.9.9 Moderator Context
+
+Moderators see the same listing as participants. Event management controls are in the Admin area (Ch.17.3), not on the events listing page. However, moderators see a subtle "Manage" link on each event card linking to the moderator dashboard's event context.
+
+---
+
+## 12.10 Scalable List Views
+
+**Added 2026-02-25**: This section defines the reusable pagination, search, and filtering pattern applied to all list views across the platform. The pattern ensures consistent UX and graceful scaling from dozens to thousands of entries.
+
+### Applicability
+
+The scalable list view pattern applies to:
+
+| Page | Route | Expected Scale |
+|------|-------|---------------|
+| Problem Backlog | `/problems` | 10s–100s of problems |
+| Events Listing | `/events` | 10s–100s of events |
+| Admin: Users | `/admin/users` | 100s–1000s of users |
+| Admin: Events | `/admin/events` | 10s–100s of events |
+| Admin: Items | `/admin/items` | 10s–100s of items |
+| Admin: Inventories | `/admin/inventories` | 10s of inventories |
+| Moderator: Backlog in dashboard | `/dashboard/moderator` | 10s–100s of problems |
+
+### 12.10.1 Server-Side Pagination
+
+All list views with potentially unbounded data use **server-side pagination**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | integer | 1 | Current page (1-indexed) |
+| `pageSize` | integer | 20 | Items per page (max 100) |
+| `search` | string | "" | Search query |
+| `sort` | string | varies | Sort field and direction |
+
+**API Response Shape** (consistent across all paginated endpoints):
+
+```json
+{
+  "items": [...],
+  "pagination": {
+    "page": 1,
+    "pageSize": 20,
+    "totalItems": 247,
+    "totalPages": 13
+  }
+}
+```
+
+For SvelteKit server routes (`+page.server.ts`), pagination parameters are read from `url.searchParams` and passed to repository functions.
+
+### 12.10.2 Search Pattern
+
+- **Debounce**: 300ms delay after last keystroke before firing search
+- **Minimum query length**: 2 characters (below 2 chars, clear search filter)
+- **Server query**: `WHERE column LIKE '%query%'` with appropriate columns per entity
+- **Case-insensitive**: `COLLATE NOCASE` (SQLite) / `ILIKE` (PostgreSQL)
+- **Clear button**: "×" icon inside search input to reset
+- **URL persistence**: Search term encoded in `?search=` query parameter
+
+### 12.10.3 Filter Pattern
+
+- Filters are rendered as dropdown selects (desktop) or horizontal pill bars / bottom sheet (mobile)
+- Each filter change resets to page 1 and triggers a server request with the full filter set
+- All active filters are encoded in URL query parameters
+- A "Clear All Filters" link appears when any non-default filter is active
+- Filters combine with AND logic
+
+### 12.10.4 URL State Management
+
+All list view state (page, search, sort, filters) is persisted in URL query parameters:
+
+```
+/problems?readiness=ready&type=greenfield&sort=newest&page=2&search=api
+/admin/users?search=eva&role=moderator&page=1
+/events?location=cologne&time=next_3_months
+```
+
+This enables:
+- **Shareable filtered views**: Copy URL to share a specific view with colleagues
+- **Browser navigation**: Back/forward through filter changes
+- **Bookmarkable searches**: Save frequently used filter combinations
+- **Page reload resilience**: Filters preserved across page refreshes
+
+### 12.10.5 Performance Targets
+
+| Metric | Target |
+|--------|--------|
+| Initial page load (server response) | < 200ms |
+| Filter/search response (server) | < 150ms |
+| Page navigation (server) | < 100ms |
+| Maximum items per page | 100 (enforced server-side) |
+
+### 12.10.6 Responsive Behavior
+
+| Viewport | Pagination | Filters | Search |
+|----------|-----------|---------|--------|
+| Desktop (≥768px) | Numbered pages with prev/next | Inline dropdown selects | Inline search input in page header |
+| Mobile (<768px) | Simplified prev/next + "Page X of Y" | Bottom sheet or horizontal pill bar | Full-width search input below title |
+
+### 12.10.7 Component References
+
+See Chapter 26.17 for the implementation-ready component specifications:
+
+- **Pagination** component (`ui/Pagination.svelte`)
+- **SearchBar** component (`ui/SearchBar.svelte`)
+- **ListFilterBar** component (`ui/ListFilterBar.svelte`)
+
+---
+
+## 12.11 Search and Discoverability [LOW PRIORITY]
+
+> **Note**: Sections 12.11 and below were renumbered when Problem Backlog Page (§12.8), Events Listing Page (§12.9), and Scalable List Views (§12.10) were added (2026-02-25).
 
 As the platform grows, finding relevant content becomes essential. This section specifies search and discovery capabilities.
 
 **Note:** This is a **low-priority enhancement** for future implementation, not MVP scope.
 
-### 12.7.1 Full-Text Search
+### 12.11.1 Full-Text Search
 
 A unified search interface that searches across all content types.
 
@@ -518,7 +982,7 @@ Search: "rate limiter"
     — From API Rate Limiter, Cologne Feb 2026
 ```
 
-### 12.7.2 Semantic Search (Future Enhancement)
+### 12.11.2 Semantic Search (Future Enhancement)
 
 Beyond keyword matching, use **vector embeddings** for semantic similarity:
 
@@ -532,7 +996,7 @@ Beyond keyword matching, use **vector embeddings** for semantic similarity:
 - Store in vector database (pgvector or external)
 - Enable "Similar problems" suggestions on Problem Cards
 
-### 12.7.3 Faceted Navigation
+### 12.11.3 Faceted Navigation
 
 Allow users to narrow results via structured filters:
 
@@ -548,7 +1012,7 @@ Allow users to narrow results via structured filters:
 - Filters persist during session
 - Saved filter presets (future): "My filters" for quick access
 
-### 12.7.4 Discovery Features
+### 12.11.4 Discovery Features
 
 **"Similar Problems" Panel (on Problem Card):**
 ```
@@ -565,7 +1029,7 @@ Based on participation history:
 - Problems from teams user has joined
 - New problems from authors user has worked with
 
-### 12.7.5 Search Data Model (Future)
+### 12.11.5 Search Data Model (Future)
 
 For semantic search, the following extensions would be needed:
 
@@ -585,7 +1049,7 @@ CREATE TABLE content_embeddings (
 
 ---
 
-## 12.8 Contributor Wall Display
+## 12.12 Contributor Wall Display
 
 **Added 2026-02-05**: Public display of top contributors on landing page (referenced in Ch.12.1, specified here for completeness).
 
@@ -646,22 +1110,27 @@ Opt-out users excluded from public display but personal progress still tracked.
 
 ---
 
-## 12.9 Relationship to Other Chapters
+## 12.13 Relationship to Other Chapters
 
-Together, these dashboards form a coherent system of views:
-- **Public Landing Page** for discovery and community showcase
-- **Event Detail Page** for event information and registration
-- **Participant Dashboard** for personalized access
-- **Event Dashboard** for shared awareness during live events
-- **Moderator Dashboard** for live orchestration
-- **Administrator Overview** for structural stewardship
+Together, these pages and dashboards form a coherent system of views:
+- **Public Landing Page** (§12.1) for discovery and community showcase
+- **Event Detail Page** (§12.2) for event information and registration
+- **Participant Dashboard** (§12.3) for personalized access
+- **Event Dashboard** (§12.4) for shared awareness during live events
+- **Moderator Dashboard** (§12.5) for live orchestration
+- **Administrator Overview** (§12.6) for structural stewardship
+- **Problem Backlog Page** (§12.8) for community-wide problem discovery
+- **Events Listing Page** (§12.9) for cross-location event browsing
 
 **Related Chapters:**
-- **Chapter 13**: Problem Card links from search results
+- **Chapter 13**: Problem Card links from listing and search results
 - **Chapter 14**: Live event indicators on dashboards
 - **Chapter 15**: Results and analytics views accessible from dashboards
+- **Chapter 17**: Administration interfaces reference scalable list views (§12.10)
 - **Chapter 18**: Authentication for personalized views
 - **Chapter 19**: Data model for search indexes
+- **Chapter 26.16**: Component specs for TopAppBar, BottomNavBar, AccountMenu
+- **Chapter 26.17**: Component specs for Pagination, SearchBar, ListFilterBar
 - **Chapter 29**: Event display and filtering
 - **Chapter 32**: Onboarding integrates with dashboard guidance
 - **Chapter 33**: Contributor wall displayed on landing page

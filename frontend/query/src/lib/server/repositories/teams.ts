@@ -509,10 +509,20 @@ export function rejoinTeam(
 
 /**
  * Set the breakout room URL for a team.
+ * Posts a system message when URL changes (TICKET-13 AC).
  */
 export function setBreakoutRoomUrl(
 	teamId: string,
-	url: string | null
+	url: string | null,
+	chatContext?: {
+		problemId: string;
+		problemVersionId: string;
+		majorVersion: number;
+		eventId: string | null;
+		contextSituation: string;
+		botUserId: string;
+		botRole: string;
+	}
 ): { success: boolean } {
 	const db = getDatabase();
 
@@ -523,6 +533,26 @@ export function setBreakoutRoomUrl(
 		WHERE team_id = ?
 	`
 	).run(url, teamId);
+
+	// Post system message when breakout URL changes (Ch.31.7)
+	if (chatContext) {
+		const timestamp = formatSystemTimestamp(new Date());
+		const content = url
+			? `─── ${timestamp} Breakout URL updated: ${url} ───`
+			: `─── ${timestamp} Breakout URL removed ───`;
+
+		postSystemMessage({
+			problemId: chatContext.problemId,
+			problemVersionId: chatContext.problemVersionId,
+			majorVersion: chatContext.majorVersion,
+			eventId: chatContext.eventId,
+			teamId: teamId,
+			contextSituation: chatContext.contextSituation,
+			content,
+			botUserId: chatContext.botUserId,
+			botRole: chatContext.botRole
+		});
+	}
 
 	return { success: true };
 }

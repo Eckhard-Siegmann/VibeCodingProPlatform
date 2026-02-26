@@ -18,6 +18,7 @@
 	import { Tooltip } from '$lib/components/ui/tooltip';
 	import { formatRelative, formatDateTime } from '$lib/utils/date-formatting';
 	import ChatBubble from './ChatBubble.svelte';
+	import Reply from '@lucide/svelte/icons/reply';
 
 	export interface ChatReaction {
 		emoji: string;
@@ -38,6 +39,7 @@
 		editedAt?: string | null;
 		reactions?: ChatReaction[];
 		replyCount?: number;
+		replyToMessageId?: string | null;
 	}
 
 	interface Props extends HTMLAttributes<HTMLDivElement> {
@@ -81,7 +83,7 @@
 	});
 </script>
 
-<div class={cn('flex w-full', containerAlign, className)} {...restProps}>
+<div class={cn('flex w-full group/msg', containerAlign, className)} {...restProps}>
 	{#if variant === 'system'}
 		<!-- System message: centered, no avatar -->
 		<ChatBubble variant="system">
@@ -118,7 +120,7 @@
 					{message.content}
 				</ChatBubble>
 
-				<!-- Timestamp and edited indicator -->
+				<!-- Timestamp, edited indicator, and reply action -->
 				<div class={cn(
 					'flex items-center gap-1.5 mt-0.5 px-1',
 					message.isOwn ? 'justify-end' : 'justify-start'
@@ -132,6 +134,17 @@
 					</Tooltip>
 					{#if message.editedAt}
 						<span class="text-[10px] text-meta italic">(edited)</span>
+					{/if}
+					{#if onReply}
+						<button
+							type="button"
+							class="opacity-0 group-hover/msg:opacity-100 focus:opacity-100 transition-opacity inline-flex items-center gap-0.5 text-[10px] text-meta hover:text-primary"
+							onclick={onReply}
+							aria-label="Reply to this message"
+						>
+							<Reply class="w-3 h-3" />
+							<span>Reply</span>
+						</button>
 					{/if}
 				</div>
 

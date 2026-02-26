@@ -5,36 +5,41 @@
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
 	interface Props {
-		data?: {
+		data: {
 			events: EventOption[];
 		};
 	}
 
 	let { data }: Props = $props();
 
-	// Demo events
-	const demoEvents: EventOption[] = [
-		{ event_slug: 'cologne-feb-2026', title: 'VibeCoding Professionals Meetup Cologne (Feb 2026)' },
-		{ event_slug: 'aachen-feb-2026', title: 'VibeCoding Professionals Meetup Aachen (Feb 2026)' },
-		{ event_slug: 'cologne-mar-2026', title: 'VibeCoding Professionals Meetup Cologne (Mar 2026)' }
-	];
+	let events = $derived(data.events);
 
-	let events = $derived(data?.events ?? demoEvents);
-
-	// Handle import
+	// Handle import — calls real API (POST /api/admin/csv-import)
 	async function handleImport(rows: CSVRow[], eventSlug?: string): Promise<ImportResult> {
-		console.log('Importing users:', rows.length, 'event:', eventSlug);
+		// Attach default eventSlug to rows that don't have one
+		const enrichedRows = rows.map((r) => ({
+			...r,
+			event_slug: r.event_slug ?? (eventSlug || undefined)
+		}));
 
-		// Simulate API call delay
-		await new Promise((resolve) => setTimeout(resolve, 1500));
+		const res = await fetch('/api/admin/csv-import', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ rows: enrichedRows })
+		});
 
-		// Demo result
+		const json = await res.json();
+
+		if (!json.success) {
+			throw new Error(json.error ?? 'Import failed.');
+		}
+
 		return {
-			total: rows.length,
-			created: Math.floor(rows.length * 0.7),
-			existing: Math.ceil(rows.length * 0.3),
-			registered: eventSlug ? Math.floor(rows.length * 0.9) : 0,
-			errors: rows.length > 10 ? [{ row: 11, message: 'Duplicate email address' }] : []
+			total: json.total,
+			created: json.created,
+			existing: json.existing,
+			registered: json.registered,
+			errors: json.errors ?? []
 		};
 	}
 

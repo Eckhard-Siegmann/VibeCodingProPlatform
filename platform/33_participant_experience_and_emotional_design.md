@@ -412,11 +412,24 @@ Points are awarded for quality content contributions. Weights are admin-configur
 - Valuable contribution (chat/lesson with ≥2 👍 or 💡 reactions)
 - Problem submitted, selected for pitch, or selected for coding
 
-**Point Awarding Rules** (Chapter 19.3.33):
+**Point Awarding Rules** (Chapter 19.3.35):
 - Points awarded immediately upon qualifying action
 - Points snapshot the `current_points` value at award time (immune to later weight changes)
-- Duplicate prevention: same action can't award points twice
+- Duplicate prevention: same action can't award points twice (enforced by UNIQUE constraint on `user_id, action_key, source_type, source_id`)
 - Event context: most points linked to specific events
+
+**Trigger Mechanism:**
+Points are awarded **reactively** as part of the same request that completes the qualifying action — never via periodic sweeps or background jobs.
+
+| Action | Trigger Point | source_type | source_id |
+|--------|--------------|-------------|-----------|
+| `review_assessment_completed` | When user submits a review response batch | `response` | First `response_id` in the batch |
+| `problem_submitted` | Inside `recordDecision('problem_submitted')` side-effects | `decision` | The `decision_id` |
+| `problem_elected_pitch` | Inside `recordDecision('selected_for_event')` side-effects | `decision` | The `decision_id` |
+| `problem_elected_coding` | Inside `recordDecision('selected_for_coding')` side-effects | `decision` | The `decision_id` |
+| `valuable_contribution` | When a reaction is added and the message reaches ≥2 qualifying reactions (👍 or 💡) | `chat_message` or `lesson` | The `message_id` or `lesson_id` |
+
+For `valuable_contribution`, the check runs on each reaction insert: count distinct qualifying reactions (👍, 💡) on the source entity; if count ≥ 2 and no existing `contribution_points` row exists for that source, award points. This ensures the point is awarded exactly once, at the moment the threshold is crossed.
 
 Administrators can adjust weights via the admin interface (Chapter 17.9.3).
 
@@ -440,12 +453,32 @@ Stars recognize outstanding solutions, not just participation.
    - Agent reviews: 0.5x weight (supporting, not authoritative)
 4. **System evolves**: As agents improve, their assessments contribute more, but human judgment remains authoritative
 
+**Star Award Scope — MVP vs. Future:**
+- **MVP** (1 team per problem per event): Star awards rank the **best coded solutions across all problems at an event**. The moderator views all coded problems with their weighted review scores and assigns 1st/2nd/3rd to the top-performing problem-solutions. All team members of a winning problem receive the same award and place.
+- **Future** (multi-team per problem): When multiple teams can work on the same problem, rankings become **per-problem** — the best solution to a single problem earns 1st place, the second-best 2nd, etc. The data model (`star_awards` with `problem_id` + `event_id` scoping) already supports this.
+
+**Score Aggregation Formula:**
+For each problem coded at an event, the weighted review score is:
+
+```
+weighted_score(problem, event) =
+    Σ(rating_value × weight_multiplier) / Σ(weight_multiplier)
+
+    over all non-NULL rating_value responses r where:
+    - r belongs to a review assessment for that problem at that event
+    - r.review_weight_key IS NOT NULL
+    - r.superseded_at IS NULL (only current responses)
+```
+
+Items are weighted equally within an assessment. The formula produces a single scalar per problem per event, used for ranking. Ties are resolved by moderator judgment (Chapter 17.9.2).
+
 **Star Award Process:**
-1. Review assessment closes
-2. Scores aggregated with weights applied
-3. Top 3 solutions ranked
-4. Moderator confirms/adjusts awards
-5. Stars recorded and visible on contributor profiles
+1. Review assessment closes (binding decision `closed_for_review`)
+2. Scores aggregated with weights applied per formula above
+3. Top 3 solutions ranked across all coded problems at the event (MVP) or within a problem (future)
+4. Moderator confirms/adjusts awards (Chapter 17.9.2)
+5. Awards recorded in `star_awards` table — all team members receive the same place
+6. Stars visible on contributor profiles and personal dashboard
 
 ### 33.6.5 Privacy and Opt-Out
 

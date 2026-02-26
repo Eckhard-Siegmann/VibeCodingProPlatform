@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import RoleSelector from './RoleSelector.svelte';
+	import PresenceModeSelector from './PresenceModeSelector.svelte';
 	import MatrixTable from './MatrixTable.svelte';
 	import ProgressIndicator from './ProgressIndicator.svelte';
 	import SubmitSection from './SubmitSection.svelte';
 	import { Card } from '$lib/components/ui/card';
 	import { responsesStore, answeredCount, canSubmit } from '$lib/stores/responses';
 	import { sessionStore } from '$lib/stores/session';
+	import { toastSuccess } from '$lib/stores/toast';
 	import type { Matrix, Role, TimeContext } from '$lib/utils/validators';
 
 	interface Props {
@@ -33,6 +35,10 @@
 	let answered = $derived($answeredCount);
 	let submitEnabled = $derived($canSubmit);
 	let session = $derived($sessionStore);
+
+	function handlePresenceChange(inPresence: boolean) {
+		sessionStore.setInPresence(inPresence);
+	}
 
 	function handleRoleChange(newRole: Role) {
 		responsesStore.setRole(newRole);
@@ -73,6 +79,15 @@
 				throw new Error('Failed to submit assessment');
 			}
 
+			const data = await response.json();
+
+			// Fire milestone toasts for any first-time achievements (Ch.33.2)
+			if (data.milestones && Array.isArray(data.milestones)) {
+				for (const ms of data.milestones) {
+					toastSuccess(ms.title, ms.message);
+				}
+			}
+
 			responsesStore.setSubmitted();
 			onSubmitSuccess?.();
 		} catch (err) {
@@ -96,6 +111,9 @@
 	<!-- Form wrapped in Card for depth on canvas -->
 	<Card elevation="resting">
 		<form onsubmit={(e) => e.preventDefault()}>
+			<!-- Participation mode selection (Ch.9.5.3, U15) -->
+			<PresenceModeSelector value={session.inPresence} onchange={handlePresenceChange} disabled={submitting} />
+
 			<!-- Role selection -->
 			<RoleSelector value={role} onchange={handleRoleChange} disabled={submitting} />
 

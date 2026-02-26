@@ -1,6 +1,6 @@
 # Admin Interfaces Design
 
-**Routes**: `/admin/*` (overview, items, inventories, events, users, csv-import)
+**Routes**: `/admin/*` (overview, items, inventories, events, users, csv-import, catalogs)
 **Purpose**: System administration and content management
 **Critical Requirement**: Full smartphone compatibility (Ch.17.0)
 **Created**: 2026-02-05
@@ -317,11 +317,15 @@
 
 **Component**: `admin/EventEditor.svelte`
 **Purpose**: Create and manage events
+**Scalability**: Uses Scalable List View pattern (Ch.12.10) — same SearchBar, ListFilterBar, Pagination components as User Management
 
 **Event List**:
 - DataTable: Partner, Location, Date, Registrations, Status
 - Mobile: Cards showing key info
 - Filters: Upcoming / Past / All, Location filter
+- Search: By event title, location, partner name (SearchBar, 300ms debounce)
+- Pagination: Server-side, 20 per page (Pagination component)
+- URL state: `/admin/events?status=upcoming&location=cologne&search=march&page=1`
 - Actions: Edit, View Registrations, Duplicate, Delete
 
 **Event Editor Form** (Mobile, vertical scroll):
@@ -417,23 +421,89 @@
 **Component**: `admin/UserList.svelte`
 **Purpose**: View and manage user accounts
 **Data**: All users with role, email status, events attended
+**Scalability**: Server-side pagination required — user list can grow to thousands (Ch.12.10, Ch.17.5)
 
-**User List Table** (Desktop):
+### Scalable List View Pattern (TICKET-30)
+
+**Added 2026-02-25**: All admin list views follow the Scalable List View pattern (Ch.12.10, Ch.26.17) to ensure graceful scaling. This section documents the shared pattern; subsequent sections show page-specific applications.
+
+**Page Header with Search**:
 ```
-| Email             | Name      | Role | Confirmed | Events | Actions |
-|-------------------|-----------|------|-----------|--------|---------|
-| max@example.com   | Max M.    | Dev  | ✓         | 5      | [⋮]     |
-| eva@example.com   | Eva S.    | Mod  | ✓         | 8      | [⋮]     |
-| tom@example.com   | Tom W.    | Dev  | ✗         | 0      | [⋮]     |
+Desktop:
+┌──────────────────────────────────────────────────────────┐
+│ User Management (247 users)             [🔍 Search…    ] │
+│                                                          │
+│ [All Roles ▼] [Email Status ▼] [Sort: Name A-Z ▼]      │
+│                                              Clear all   │
+├──────────────────────────────────────────────────────────┤
+
+Mobile:
+┌──────────────────────────────────┐
+│ User Management                  │
+│ 247 users                        │
+│                                  │
+│ [🔍 Search users…_____________] │
+│                                  │
+│ [All Roles] [Email ▼] [Sort ▶] │ ← Scrollable pills
+├──────────────────────────────────┤
 ```
 
-**User List Cards** (Mobile):
+**Components Used**:
+- `ui/SearchBar.svelte` (Ch.26.17.2) — debounced, 300ms, min 2 chars
+- `ui/ListFilterBar.svelte` (Ch.26.17.3) — dropdowns or pill bar
+- `ui/Pagination.svelte` (Ch.26.17.1) — numbered pages (desktop) / prev-next (mobile)
+
+**URL State**: All filters, search, sort, and page encoded in query params:
+```
+/admin/users?search=eva&role=moderator&email=confirmed&sort=name_asc&page=1
+```
+
+**Server-Side Query Pattern**:
+```typescript
+// +page.server.ts
+const page = parseInt(url.searchParams.get('page') || '1');
+const search = url.searchParams.get('search') || '';
+const role = url.searchParams.get('role') || 'all';
+const emailStatus = url.searchParams.get('email') || 'all';
+const sort = url.searchParams.get('sort') || 'name_asc';
+
+const result = await listUsersPaginated({
+  page, pageSize: 20, search, role, emailStatus, sort
+});
+// Returns: { items: User[], pagination: { page, pageSize, totalItems, totalPages } }
+```
+
+### User List Page Layout
+
+**User List Table** (Desktop ≥768px):
+```
+┌──────────────────────────────────────────────────────────┐
+│ | Email             | Name      | Role | ✉ | Events | ⋮ |│
+│ |-------------------|-----------|------|---|--------|---|│
+│ | max@example.com   | Max M.    | Dev  | ✓ | 5      | ⋮ |│
+│ | eva@example.com   | Eva S.    | Mod  | ✓ | 8      | ⋮ |│
+│ | tom@example.com   | Tom W.    | Dev  | ✗ | 0      | ⋮ |│
+│ | {17 more rows}                                        │
+│                                                          │
+│ Showing 1-20 of 247    [◀ Prev] 1 [2] 3 … 13 [Next ▶] │
+└──────────────────────────────────────────────────────────┘
+```
+
+**User List Cards** (Mobile <768px):
 ```
 ┌──────────────────────────────────┐
 │ Max Mustermann              [⋮]  │
 │ max@example.com                  │
 │ Developer • 5 events • ✓         │
 └──────────────────────────────────┘
+
+┌──────────────────────────────────┐
+│ Eva Schmidt                 [⋮]  │
+│ eva@example.com                  │
+│ Moderator • 8 events • ✓        │
+└──────────────────────────────────┘
+
+[◀ Prev]  Page 2 of 13  [Next ▶]
 ```
 
 **ActionMenu** (⋮) contains:
@@ -444,21 +514,46 @@
 - View Activity Log
 - Disable Account (soft delete, requires confirmation)
 
-**Filters**:
-- Role: All, Observer, Developer, Moderator, Admin
-- Email Status: All, Confirmed, Unconfirmed
-- Newsletter: All, Subscribed, Unsubscribed
-- Events: Any, 0 events, 1-5 events, 5+ events
+**Filter Configuration**:
+```typescript
+const filters: FilterConfig[] = [
+  {
+    key: 'role',
+    label: 'Role',
+    options: [
+      { value: 'all', label: 'All Roles' },
+      { value: 'observer', label: 'Observer' },
+      { value: 'developer', label: 'Developer' },
+      { value: 'moderator', label: 'Moderator' },
+      { value: 'admin', label: 'Admin' },
+      { value: 'agent', label: 'Agent' },
+    ],
+    defaultValue: 'all',
+  },
+  {
+    key: 'email',
+    label: 'Email Status',
+    options: [
+      { value: 'all', label: 'All' },
+      { value: 'confirmed', label: 'Confirmed' },
+      { value: 'unconfirmed', label: 'Unconfirmed' },
+    ],
+    defaultValue: 'all',
+  },
+];
+```
+
+**Sort Options**:
+- Name A-Z (default)
+- Name Z-A
+- Newest First
+- Oldest First
+- By Role
 
 **Mobile Filter UI**:
-- FilterBottomSheet (slides from bottom)
-- All filters vertical
-- Apply + Reset buttons at bottom
-
-**Search**:
-- Search box: Filter by name or email
-- Real-time filtering as user types
-- Clear button (X icon)
+- Horizontal scrollable pill bar (replaces previous FilterBottomSheet approach)
+- Active pills highlighted with `border-primary text-primary`
+- Same components as Problem Backlog and Events Listing for consistency
 
 **Bulk Actions** (Future):
 - Select multiple users (checkboxes)
@@ -678,6 +773,252 @@ All forms: Full-width inputs, 44px height, vertical labels.
 
 ---
 
+## Catalog & Weight Management (/admin/catalogs)
+
+**Component**: `admin/CatalogEditor.svelte`
+**Purpose**: Manage soft catalogs and tunable weights (Ch.17.10)
+**Spec**: Ch.17.10 (Catalog and Weight Management)
+
+### Tabbed Navigation
+
+Five tabs, one per manageable catalog:
+
+1. **Problem Types** — `problem_type_catalog`
+2. **Emojis** — `emoji_catalog`
+3. **Lesson Categories** — `lesson_category_catalog`
+4. **Contribution Weights** — `contribution_action_catalog`
+5. **Review Weights** — `review_weight_catalog`
+
+**Desktop** (≥768px): Standard horizontal tab bar.
+**Mobile** (<768px): Horizontal scrollable pill tabs (overflow-x-auto).
+
+### Page Layout (Desktop)
+
+```
+┌──────────────────────────────────────────────────────┐
+│ Catalog & Weight Management                          │
+│                                                      │
+│ [Problem Types] [Emojis] [Lessons] [Contrib] [Review]│
+│ ─────────────────────────────────────────────────    │
+│                                                      │
+│ [+ Add Problem Type]     [Show Inactive]             │
+│                                                      │
+│ | Key              | Display Name      | Active | ⋮ |│
+│ |------------------|-------------------|--------|---|│
+│ | greenfield       | Greenfield        | ✓      | ⋮ |│
+│ | explorative      | Explorative       | ✓      | ⋮ |│
+│ | brownfield       | Brownfield        | ✓      | ⋮ |│
+│ | advanced_greenf… | Advanced Greenf…  | ✓      | ⋮ |│
+│ | reverse_engineer…| Reverse Engineer… | ✓      | ⋮ |│
+│ | other            | Other             | ✓      | ⋮ |│
+│                                                      │
+└──────────────────────────────────────────────────────┘
+```
+
+### Page Layout (Mobile — Cards)
+
+```
+┌────────────────────────────────────┐
+│ Catalog & Weight Management        │
+│                                    │
+│ [Problem Types ▾] [Emojis] [Less…] │ ← Scrollable pills
+│                                    │
+│ [+ Add Problem Type]               │
+│                                    │
+│ ┌────────────────────────────────┐ │
+│ │ greenfield              Active │ │
+│ │ "Greenfield"                   │ │
+│ │ New project from scratch       │ │
+│ │ [Edit] [Deactivate]           │ │
+│ └────────────────────────────────┘ │
+│                                    │
+│ ┌────────────────────────────────┐ │
+│ │ explorative             Active │ │
+│ │ "Explorative"                  │ │
+│ │ Early-stage idea exploration   │ │
+│ │ [Edit] [Deactivate]           │ │
+│ └────────────────────────────────┘ │
+│                                    │
+│ {4 more entries}                   │
+└────────────────────────────────────┘
+```
+
+### Emoji Tab (Special Layout)
+
+Emojis display the emoji character prominently:
+
+```
+┌────────────────────────────────────┐
+│ [+ Add Emoji]                      │
+│                                    │
+│ ┌────────────────────────────────┐ │
+│ │ 👍  Thumbs Up           Active │ │
+│ │ [Edit Name] [Deactivate]       │ │
+│ └────────────────────────────────┘ │
+│                                    │
+│ ┌────────────────────────────────┐ │
+│ │ 👎  Thumbs Down         Active │ │
+│ │ [Edit Name] [Deactivate]       │ │
+│ └────────────────────────────────┘ │
+│                                    │
+│ {8 more emojis}                    │
+└────────────────────────────────────┘
+```
+
+### Contribution Weights Tab
+
+Shows current vs default points with inline editing:
+
+```
+┌────────────────────────────────────────────────┐
+│ [+ Add Action]                                  │
+│                                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ review_assessment_completed          Active │ │
+│ │ "Review Assessment"                         │ │
+│ │ Completed a review assessment               │ │
+│ │ Default: 1pt   Current: [1___]pt  [Save]   │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ valuable_contribution                Active │ │
+│ │ "Valuable Contribution"                     │ │
+│ │ Chat/lesson with ≥2 reactions               │ │
+│ │ Default: 1pt   Current: [1___]pt  [Save]   │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ {3 more actions}                                │
+└────────────────────────────────────────────────┘
+```
+
+### Review Weights Tab
+
+Shows multiplier values with inline editing:
+
+```
+┌────────────────────────────────────────────────┐
+│ ┌─────────────────────────────────────────────┐ │
+│ │ live_review                          Active │ │
+│ │ "Live Review"                               │ │
+│ │ Review during event (time-constrained)      │ │
+│ │ Multiplier: [1.00___]x              [Save] │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ post_event_review                    Active │ │
+│ │ "Post-Event Review"                         │ │
+│ │ Review after event (more time to verify)    │ │
+│ │ Multiplier: [1.50___]x              [Save] │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ agent_review                         Active │ │
+│ │ "Agent Review"                              │ │
+│ │ AI agent assessment (supporting)            │ │
+│ │ Multiplier: [0.50___]x              [Save] │ │
+│ └─────────────────────────────────────────────┘ │
+└────────────────────────────────────────────────┘
+```
+
+### Add/Edit Entry Modal (FormDialog)
+
+**For Soft Catalogs** (problem types, lesson categories):
+```
+┌────────────────────────────────────┐
+│ [×] Add Problem Type               │
+│                                    │
+│ Key *                              │
+│ [brownfield_legacy____________]    │ ← Lowercase, underscores
+│                                    │
+│ Display Name *                     │
+│ [Brownfield Legacy___________]     │
+│                                    │
+│ Description                        │
+│ [Working with aging codebase_]     │ ← Textarea, 2 rows
+│ [___________________________]      │
+│                                    │
+│ Sort Order *                       │
+│ [7_____________]                   │ ← Number input
+│                                    │
+│ [Cancel]            [Add Entry]    │
+└────────────────────────────────────┘
+```
+
+**For Emojis**:
+```
+┌────────────────────────────────────┐
+│ [×] Add Emoji                      │
+│                                    │
+│ Emoji Character *                  │
+│ [🎯____________________________]  │ ← Single emoji input
+│                                    │
+│ Display Name *                     │
+│ [Bullseye____________________]     │
+│                                    │
+│ Sort Order *                       │
+│ [11____________]                   │
+│                                    │
+│ [Cancel]            [Add Emoji]    │
+└────────────────────────────────────┘
+```
+
+**For Contribution Actions**:
+```
+┌────────────────────────────────────┐
+│ [×] Add Contribution Action        │
+│                                    │
+│ Action Key *                       │
+│ [late_review_completed_______]     │
+│                                    │
+│ Display Name *                     │
+│ [Late Review Completed_______]     │
+│                                    │
+│ Description                        │
+│ [Review submitted after event]     │
+│ [___________________________]      │
+│                                    │
+│ Default Points *                   │
+│ [1_____________]                   │
+│                                    │
+│ Current Points *                   │
+│ [1_____________]                   │
+│                                    │
+│ [Cancel]           [Add Action]    │
+└────────────────────────────────────┘
+```
+
+### Deactivation Confirmation
+
+When toggling a catalog entry inactive, show ConfirmDialog:
+
+```
+┌────────────────────────────────────┐
+│ Deactivate "greenfield"?           │
+│                                    │
+│ This will prevent "Greenfield"     │
+│ from being used in new problems.   │
+│ Existing problems with this type   │
+│ will not be affected.              │
+│                                    │
+│ [Cancel]           [Deactivate]    │
+└────────────────────────────────────┘
+```
+
+### Validation
+
+- Key: Required, lowercase, underscores only (`^[a-z][a-z0-9_]*$`), unique within catalog
+- Display Name: Required, 1-60 characters
+- Emoji: Required, must be a single valid emoji character
+- Sort Order: Required, positive integer
+- Points/Weight: Required, positive number (integer for points, decimal for multiplier)
+
+### Data Loading
+
+- All catalogs load all entries (low counts, no pagination)
+- Active entries sorted by sort_order, inactive appended after
+
+---
+
 ## Mobile Testing Requirements
 
 **Every admin interface tested at 375px**:
@@ -700,6 +1041,10 @@ All forms: Full-width inputs, 44px height, vertical labels.
 | CSV Preview | Cards readable | [ ] |
 | CSV Wizard | 4 steps navigate correctly | [ ] |
 | Partner Editor | All fields accessible | [ ] |
+| Catalog Tabs | Horizontal scroll pills | [ ] |
+| Catalog List | Table→Card transform | [ ] |
+| Catalog Add/Edit | FormDialog scroll-accessible | [ ] |
+| Weight Editing | Inline input + Save button | [ ] |
 
 **All must PASS before mobile admin guarantee can be claimed.**
 
@@ -739,14 +1084,51 @@ All forms: Full-width inputs, 44px height, vertical labels.
 - Toast: "Draft saved" (subtle)
 - Clear draft on submit success
 
-**Data Loading**:
-- Item list: Loads all (low count, no pagination)
-- Inventory list: Loads all (low count)
-- User list: Pagination (50 per page) OR virtual scroll
-- Event list: Filter upcoming/past, load per filter
+**Data Loading** (updated for TICKET-30 scalability):
+- Item list: Loads all (low count, no pagination needed)
+- Inventory list: Loads all (low count, no pagination needed)
+- User list: **Server-side pagination**, 20 per page, with search and filters (Ch.12.10)
+- Event list: **Server-side pagination**, 20 per page, with search and filters (Ch.12.10)
+- Catalog entries: Loads all (low count by design)
+
+**Pagination API Response Shape** (consistent across all paginated admin endpoints):
+```typescript
+interface PaginatedResponse<T> {
+  items: T[];
+  pagination: {
+    page: number;       // Current page (1-indexed)
+    pageSize: number;   // Items per page
+    totalItems: number; // Total matching items
+    totalPages: number; // Computed ceiling
+  };
+}
+```
 
 ---
 
-**Document Version**: 1.0.0
-**Lines**: ~600
-**Status**: Complete
+## Scalability Testing Checklist (TICKET-30)
+
+**Added 2026-02-25**: Verify all admin list views scale gracefully.
+
+| Test | Route | Pass |
+|------|-------|------|
+| User list pagination works with 500+ users | `/admin/users` | [ ] |
+| User search by name/email debounces and returns results | `/admin/users?search=eva` | [ ] |
+| User role filter reduces result set | `/admin/users?role=moderator` | [ ] |
+| Event list pagination works with 100+ events | `/admin/events` | [ ] |
+| Event search works | `/admin/events?search=cologne` | [ ] |
+| URL state persists across page refresh | All admin routes | [ ] |
+| Back button navigates through filter history | All admin routes | [ ] |
+| Mobile: Simplified pagination (prev/next) | All admin routes at 375px | [ ] |
+| Mobile: Filter pills scroll horizontally | All admin routes at 375px | [ ] |
+| Page size enforced server-side (max 100) | All admin endpoints | [ ] |
+| Empty state shows when search has no results | All admin routes | [ ] |
+| "Clear all" resets to defaults | All admin routes | [ ] |
+| Performance: Initial load < 200ms | All admin routes | [ ] |
+| Performance: Filter/search < 150ms | All admin routes | [ ] |
+
+---
+
+**Document Version**: 1.2.0
+**Last Updated**: 2026-02-25
+**Status**: Complete (amended for TICKET-30 scalability)

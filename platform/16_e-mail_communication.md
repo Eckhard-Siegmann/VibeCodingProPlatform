@@ -144,12 +144,41 @@ These require additional infrastructure (notification preference management, per
 
 ---
 
-## 16.5 Relationship to Other Chapters
+## 16.6 Versioned Event Email Templates
+
+To provide moderators with granular content control and maintain a perfect audit history of what was sent to users, event-specific communications (Invitations, Reminders, and Waitlist Notifications) rely on a versioned template system.
+
+### 16.6.1 The Default Template & Event Creation
+The platform maintains a single **Global Default Template** for Event Invitations/Reminders.
+When a new Event is planned or created in the system, this global default is copied and saved as **Version 1** in the `event_email_templates` table specifically for that event, with `is_current = true`.
+
+### 16.6.2 Moderator Customization & Versioning
+Moderators can view and edit the active template for an event via the Moderator Dashboard.
+Because emails may be sent out gradually (e.g., as waitlist spots open over weeks), editing an active template **does not mutate** the existing record.
+Instead, when a moderator makes a change (e.g., adding "Special Guest: The Mayor!") and saves:
+1. The previous version is marked `is_current = false`.
+2. A new version (e.g., Version 2) is created with the new text and marked `is_current = true`.
+
+### 16.6.3 Dispatch Resolution
+When an email trigger is fired (either manually by a moderator or fully automatically by the OS-Cron):
+The system *always* uses the `body_markdown` of the template version where `is_current = true` at the exact millisecond the trigger executes.
+
+**Contextual Overrides & Appendices**:
+- **Event Reminders / Invitations**: Receive the versioned template exactly as authored.
+- **Waitlist Auto-Invitations**: To obey the DRY principle, the system dynamically appends a non-versioned, hardcoded string to the bottom of the current versioned template before sending.
+  - *Added Text*: `"A spot has opened up for you! Please log in and explicitly confirm your participation within 24 hours, or this spot will be offered to the next person on the waitlist."*
+
+This guarantees that a late registrant pulled from the waitlist receives the exact same "Special Guest" context (e.g., Version 3) as the general attendee base, alongside their specific temporal constraints.
+
+---
+
+## 16.7 Relationship to Other Chapters
 
 - **Chapter 1**: Design principles — stateless platform architecture constrains trigger patterns
 - **Chapter 10**: Decisions — decision recording triggers PO notifications
 - **Chapter 18**: Authentication — OTP, password reset, email confirmation flows; `email_confirmed` field gates informational email delivery
-- **Chapter 19**: Data model — `users.email_confirmed` field
+- **Chapter 19**: Data model — `users.email_confirmed` field, `event_email_templates` (§19.3.9), `communications_log` (§19.3.10)
+- **ADR 010**: Time and Scheduling Architecture — OS-Cron hybrid model for automated waitlist emails and moderator-controlled broadcasts
 - **Chapter 25**: Interview findings — error handling and bounce policy
 - **Chapter 29**: Events and locations — event invitation, reminder (§29.11.1), and follow-up (§29.11.4) triggers
 - **Chapter 30**: Registration and onboarding — registration confirmation, waitlist notification (§30.9), welcome email (§30.11.1)

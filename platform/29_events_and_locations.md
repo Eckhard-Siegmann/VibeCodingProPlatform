@@ -290,12 +290,14 @@ The system maintains **two distinct state tracking mechanisms**:
 
 **Relationship**: When a problem is `selected_for_event` (action state), it may have different queue states in different event queues. A problem in `backlog` action state would not appear in any event queue.
 
-| Queue State | Meaning |
-|-------------|---------|
-| `candidate` | Problem is a candidate for this event |
-| `selected_for_pitch` | Problem will be pitched at this event |
-| `selected_for_coding` | Problem selected for sprint at this event |
-| `completed` | Problem work completed at this event |
+| Queue State | Meaning | Set By |
+|-------------|---------|--------|
+| `candidate` | Problem is a candidate for this event | `selected_for_event` decision (default initial state) |
+| `selected_for_pitch` | Problem will be pitched at this event | *Future enhancement* — no decision currently triggers this transition |
+| `selected_for_coding` | Problem selected for sprint at this event | `selected_for_coding` decision |
+| `completed` | Problem work completed at this event | `closed_complete` or `closed_partial` decision |
+
+> **Note**: The `selected_for_pitch` queue state is defined for completeness but is not currently set by any decision type. The `opened_for_pitch_assessment` decision affects only `event_live_context` (live orchestration), not the queue state. A future enhancement may link pitch opening to this queue state transition. See Ch.22 for open questions.
 
 A problem can be associated with multiple events over time, enabling longitudinal analysis.
 

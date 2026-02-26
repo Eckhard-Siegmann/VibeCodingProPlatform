@@ -3,17 +3,32 @@
 	import { Card, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import EditableField from './EditableField.svelte';
 
+	interface RepoSnapshot {
+		snapshot_id: string;
+		problem_id: string;
+		major_version: number;
+		minor_version: number;
+		head_commit_sha: string;
+		first_seen_at: string;
+	}
+
 	interface Props {
 		version: ProblemVersion;
 		canEdit?: boolean;
+		latestSnapshot?: RepoSnapshot | null;
 		onFieldUpdate?: (field: string, value: string | number) => Promise<boolean>;
 	}
 
-	let { version, canEdit = false, onFieldUpdate }: Props = $props();
+	let { version, canEdit = false, latestSnapshot, onFieldUpdate }: Props = $props();
 
 	async function handleUpdate(field: string, value: string | number): Promise<boolean> {
 		if (!onFieldUpdate) return false;
 		return await onFieldUpdate(field, value);
+	}
+
+	// Format commit hash for display (first 7 chars, standard short SHA)
+	function shortSha(sha: string): string {
+		return sha.slice(0, 7);
 	}
 </script>
 
@@ -159,6 +174,36 @@
 						})}
 					</dd>
 				</div>
+
+				<!-- Git Commit Hash Snapshot (Ch.5.2, Ch.13.1) -->
+				{#if latestSnapshot}
+					<div>
+						<dt class="text-sm font-medium text-labels">Repository Snapshot</dt>
+						<dd class="mt-1">
+							<span class="inline-flex items-center gap-1.5">
+								<code class="text-sm font-mono bg-canvas px-1.5 py-0.5 rounded text-headers">
+									{shortSha(latestSnapshot.head_commit_sha)}
+								</code>
+								<span class="text-xs text-meta">
+									(v{latestSnapshot.major_version}.{String(latestSnapshot.minor_version).padStart(2, '0')})
+								</span>
+							</span>
+							<p class="text-xs text-meta mt-0.5">
+								First seen {new Date(latestSnapshot.first_seen_at).toLocaleDateString('en-US', {
+									month: 'short',
+									day: 'numeric',
+									hour: '2-digit',
+									minute: '2-digit'
+								})}
+							</p>
+						</dd>
+					</div>
+				{:else}
+					<div>
+						<dt class="text-sm font-medium text-labels">Repository Snapshot</dt>
+						<dd class="mt-1 text-meta italic text-sm">No snapshot recorded</dd>
+					</div>
+				{/if}
 			</dl>
 		{/if}
 	</Card>

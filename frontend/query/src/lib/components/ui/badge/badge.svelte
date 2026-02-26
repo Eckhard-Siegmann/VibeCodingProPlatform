@@ -3,7 +3,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils';
 
-	type BadgeVariant =
+	export type BadgeVariant =
 		| 'default'
 		| 'secondary'
 		| 'outline'

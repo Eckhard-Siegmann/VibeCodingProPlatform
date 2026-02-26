@@ -5,7 +5,8 @@ import {
 	findInventoryById,
 	findInventoryByKey,
 	getInventoryItems,
-	buildRenderStructure
+	buildRenderStructure,
+	getTimerForAssessment
 } from '$lib/server/repositories/assessments';
 import { resolveItemKeys } from '$lib/server/repositories/items';
 
@@ -55,6 +56,11 @@ export const GET: RequestHandler = async ({ params }) => {
 			console.warn(`Missing active items for keys: ${missingKeys.join(', ')}`);
 		}
 
+		// Get timer info from live context if assessment is event-linked
+		const timerEndsAt = assessment.event_id
+			? getTimerForAssessment(assessment.event_id)
+			: null;
+
 		// Build render structure per Ch.7.4
 		const renderStructure = buildRenderStructure(
 			assessmentId,
@@ -63,7 +69,8 @@ export const GET: RequestHandler = async ({ params }) => {
 			resolvedItems,
 			assessment.problem_id,
 			assessment.major_version,
-			assessment.closed_at
+			assessment.closed_at,
+			timerEndsAt
 		);
 
 		return json(renderStructure);

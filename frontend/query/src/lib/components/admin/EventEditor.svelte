@@ -33,18 +33,20 @@
 
 	export interface EventData {
 		event_id?: string;
+		slug?: string;
 		title: string;
 		description?: string;
 		partner_id: string;
 		room_id: string;
 		host_user_id: string;
-		cohost_user_id?: string;
-		start_time: string; // ISO datetime
-		end_time?: string;
-		external_url?: string;
+		co_host_1_user_id?: string;
+		co_host_2_user_id?: string;
+		starts_at: string; // ISO datetime
+		planned_ends_at?: string;
+		website_url?: string;
 		linkedin_url?: string;
-		x_url?: string;
-		overbooking_factor: number;
+		x_post_url?: string;
+		overbooking_factor: number; // decimal e.g. 1.30
 		image_url?: string;
 	}
 
@@ -78,14 +80,15 @@
 	let partnerId = $state('');
 	let roomId = $state('');
 	let hostUserId = $state('');
-	let cohostUserId = $state('');
+	let cohost1UserId = $state('');
+	let cohost2UserId = $state('');
 	let startDate = $state('');
 	let startTime = $state('');
 	let endDate = $state('');
 	let endTime = $state('');
-	let externalUrl = $state('');
+	let websiteUrl = $state('');
 	let linkedinUrl = $state('');
-	let xUrl = $state('');
+	let xPostUrl = $state('');
 	let overbookingFactor = $state('130');
 	let imageUrl = $state('');
 
@@ -100,11 +103,12 @@
 			partnerId = event?.partner_id ?? '';
 			roomId = event?.room_id ?? '';
 			hostUserId = event?.host_user_id ?? '';
-			cohostUserId = event?.cohost_user_id ?? '';
+			cohost1UserId = event?.co_host_1_user_id ?? '';
+			cohost2UserId = event?.co_host_2_user_id ?? '';
 
 			// Parse dates and times from ISO string
-			if (event?.start_time) {
-				const start = new Date(event.start_time);
+			if (event?.starts_at) {
+				const start = new Date(event.starts_at);
 				startDate = start.toISOString().split('T')[0];
 				startTime = start.toTimeString().slice(0, 5);
 			} else {
@@ -112,8 +116,8 @@
 				startTime = '18:00';
 			}
 
-			if (event?.end_time) {
-				const end = new Date(event.end_time);
+			if (event?.planned_ends_at) {
+				const end = new Date(event.planned_ends_at);
 				endDate = end.toISOString().split('T')[0];
 				endTime = end.toTimeString().slice(0, 5);
 			} else {
@@ -121,10 +125,15 @@
 				endTime = '21:00';
 			}
 
-			externalUrl = event?.external_url ?? '';
+			// Convert decimal factor (1.30) to percentage (130) for display
+			const factorAsPercent = event?.overbooking_factor
+				? Math.round(event.overbooking_factor * 100)
+				: 130;
+
+			websiteUrl = event?.website_url ?? '';
 			linkedinUrl = event?.linkedin_url ?? '';
-			xUrl = event?.x_url ?? '';
-			overbookingFactor = event?.overbooking_factor?.toString() ?? '130';
+			xPostUrl = event?.x_post_url ?? '';
+			overbookingFactor = factorAsPercent.toString();
 			imageUrl = event?.image_url ?? '';
 			errors = {};
 		}
@@ -149,10 +158,17 @@
 		...moderators.map((m) => ({ value: m.user_id, label: `${m.display_name} (${m.email})` }))
 	]);
 
-	const cohostOptions = $derived<SelectOption[]>([
+	const cohost1Options = $derived<SelectOption[]>([
 		{ value: '', label: 'No co-host' },
 		...moderators
-			.filter((m) => m.user_id !== hostUserId)
+			.filter((m) => m.user_id !== hostUserId && m.user_id !== cohost2UserId)
+			.map((m) => ({ value: m.user_id, label: `${m.display_name} (${m.email})` }))
+	]);
+
+	const cohost2Options = $derived<SelectOption[]>([
+		{ value: '', label: 'No co-host' },
+		...moderators
+			.filter((m) => m.user_id !== hostUserId && m.user_id !== cohost1UserId)
 			.map((m) => ({ value: m.user_id, label: `${m.display_name} (${m.email})` }))
 	]);
 
@@ -199,14 +215,14 @@
 
 		// Validate URLs if provided
 		const urlPattern = /^https?:\/\/.+/;
-		if (externalUrl && !urlPattern.test(externalUrl)) {
-			newErrors.externalUrl = 'Must be a valid URL (https://...)';
+		if (websiteUrl && !urlPattern.test(websiteUrl)) {
+			newErrors.websiteUrl = 'Must be a valid URL (https://...)';
 		}
 		if (linkedinUrl && !urlPattern.test(linkedinUrl)) {
 			newErrors.linkedinUrl = 'Must be a valid URL (https://...)';
 		}
-		if (xUrl && !urlPattern.test(xUrl)) {
-			newErrors.xUrl = 'Must be a valid URL (https://...)';
+		if (xPostUrl && !urlPattern.test(xPostUrl)) {
+			newErrors.xPostUrl = 'Must be a valid URL (https://...)';
 		}
 		if (imageUrl && !urlPattern.test(imageUrl)) {
 			newErrors.imageUrl = 'Must be a valid URL (https://...)';
@@ -226,18 +242,20 @@
 
 		const eventData: EventData = {
 			event_id: mode === 'edit' ? event?.event_id : undefined,
+			slug: mode === 'edit' ? event?.slug : undefined,
 			title: title.trim(),
 			description: description.trim() || undefined,
 			partner_id: partnerId,
 			room_id: roomId,
 			host_user_id: hostUserId,
-			cohost_user_id: cohostUserId || undefined,
-			start_time: startDateTime.toISOString(),
-			end_time: endDateTime?.toISOString(),
-			external_url: externalUrl.trim() || undefined,
+			co_host_1_user_id: cohost1UserId || undefined,
+			co_host_2_user_id: cohost2UserId || undefined,
+			starts_at: startDateTime.toISOString(),
+			planned_ends_at: endDateTime?.toISOString(),
+			website_url: websiteUrl.trim() || undefined,
 			linkedin_url: linkedinUrl.trim() || undefined,
-			x_url: xUrl.trim() || undefined,
-			overbooking_factor: parseInt(overbookingFactor),
+			x_post_url: xPostUrl.trim() || undefined,
+			overbooking_factor: parseInt(overbookingFactor) / 100, // Convert percentage to decimal (130 → 1.30)
 			image_url: imageUrl.trim() || undefined
 		};
 
@@ -432,7 +450,7 @@
 				Event Hosts
 			</h3>
 
-			<div class="grid gap-4 md:grid-cols-2">
+			<div class="space-y-4">
 				<div class="space-y-1.5">
 					<Select
 						label="Host (Moderator)"
@@ -448,8 +466,14 @@
 					{/if}
 				</div>
 
-				<div class="space-y-1.5">
-					<Select label="Co-host (optional)" options={cohostOptions} bind:value={cohostUserId} />
+				<div class="grid gap-4 md:grid-cols-2">
+					<div class="space-y-1.5">
+						<Select label="Co-host 1 (optional)" options={cohost1Options} bind:value={cohost1UserId} />
+					</div>
+
+					<div class="space-y-1.5">
+						<Select label="Co-host 2 (optional)" options={cohost2Options} bind:value={cohost2UserId} />
+					</div>
 				</div>
 			</div>
 		</div>
@@ -505,26 +529,26 @@
 
 			<div class="space-y-4">
 				<div class="space-y-1.5">
-					<label for="external-url" class="block text-sm font-medium text-headers">
+					<label for="website-url" class="block text-sm font-medium text-headers">
 						Event Website
 					</label>
 					<input
-						id="external-url"
+						id="website-url"
 						type="url"
-						bind:value={externalUrl}
+						bind:value={websiteUrl}
 						placeholder="https://..."
 						class={cn(
 							'w-full px-3 py-2 min-h-[44px]',
 							'bg-card border-2 rounded-[var(--radius-card)]',
 							'text-headers placeholder:text-meta',
 							'focus:outline-none focus:border-primary',
-							errors.externalUrl ? 'border-alert' : 'border-secondary'
+							errors.websiteUrl ? 'border-alert' : 'border-secondary'
 						)}
 					/>
-					{#if errors.externalUrl}
+					{#if errors.websiteUrl}
 						<p class="flex items-center gap-1 text-sm text-alert">
 							<AlertCircle class="w-4 h-4" />
-							{errors.externalUrl}
+							{errors.websiteUrl}
 						</p>
 					{/if}
 				</div>
@@ -556,24 +580,24 @@
 					</div>
 
 					<div class="space-y-1.5">
-						<label for="x-url" class="block text-sm font-medium text-headers">X (Twitter)</label>
+						<label for="x-post-url" class="block text-sm font-medium text-headers">X (Twitter)</label>
 						<input
-							id="x-url"
+							id="x-post-url"
 							type="url"
-							bind:value={xUrl}
+							bind:value={xPostUrl}
 							placeholder="https://x.com/..."
 							class={cn(
 								'w-full px-3 py-2 min-h-[44px]',
 								'bg-card border-2 rounded-[var(--radius-card)]',
 								'text-headers placeholder:text-meta',
 								'focus:outline-none focus:border-primary',
-								errors.xUrl ? 'border-alert' : 'border-secondary'
+								errors.xPostUrl ? 'border-alert' : 'border-secondary'
 							)}
 						/>
-						{#if errors.xUrl}
+						{#if errors.xPostUrl}
 							<p class="flex items-center gap-1 text-sm text-alert">
 								<AlertCircle class="w-4 h-4" />
-								{errors.xUrl}
+								{errors.xPostUrl}
 							</p>
 						{/if}
 					</div>

@@ -39,7 +39,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		body = AddReactionSchema.parse(rawBody);
 	} catch (err) {
 		if (err instanceof z.ZodError) {
-			throw error(400, `Validation error: ${err.errors.map(e => e.message).join(', ')}`);
+			throw error(400, `Validation error: ${err.issues.map((e: z.ZodIssue) => e.message).join(', ')}`);
 		}
 		throw error(400, 'Invalid request body');
 	}
@@ -97,7 +97,7 @@ export const DELETE: RequestHandler = async ({ params, request }) => {
 		body = RemoveReactionSchema.parse(rawBody);
 	} catch (err) {
 		if (err instanceof z.ZodError) {
-			throw error(400, `Validation error: ${err.errors.map(e => e.message).join(', ')}`);
+			throw error(400, `Validation error: ${err.issues.map((e: z.ZodIssue) => e.message).join(', ')}`);
 		}
 		throw error(400, 'Invalid request body');
 	}

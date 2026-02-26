@@ -197,12 +197,22 @@ The public view contains **no editing controls** for Problem Card content (unles
 
 ## 13.2 Owner View
 
-The **Owner View** is displayed when the authenticated user is the **Problem Owner**. It is accessed via "My Problems" in the dashboard or directly via the problem URL.
+The **Owner View** is displayed when the authenticated user is the **Problem Owner** or **Deputy Problem Owner** for this problem. It is accessed via "My Problems" in the dashboard or directly via the problem URL. Access is determined by authentication and role — the same URL serves different controls based on who is logged in.
 
-### Edit Mode Indicator
-At the top of the page, an indicator shows:
-- "**You are the Problem Owner**"
-- Current edit status (draft, submitted, etc.)
+### Ownership Banner
+At the top of the page, an informational banner communicates elevated rights:
+
+**Problem Owner variant:**
+- Blue-tinted background (`bg-primary/8`), left accent border (`border-left: 3px solid primary`)
+- Heading: "You are the Problem Owner"
+- Subtext: Current edit status (e.g., "Status: Draft - Editing enabled" or "Status: Submitted - Read-only")
+
+**Deputy PO variant:**
+- Purple-tinted background (`bg-purple/8`), left accent border (`border-left: 3px solid purple`)
+- Heading: "You are the Deputy Problem Owner"
+- Subtext: Same edit status line as PO variant
+
+The banner is **not shown** when a PO visits another PO's problem — only when the authenticated user has ownership rights on *this specific problem*.
 
 ### Best Practices Link
 In draft mode, a prominent link to the **Best Practices Guide** is displayed. This guide helps Problem Owners understand:
@@ -212,7 +222,7 @@ In draft mode, a prominent link to the **Best Practices Guide** is displayed. Th
 - That rough, exploratory problems are welcome and moderators can help refine them
 
 ### Editable Content
-In the private view, the Problem Owner may edit all Problem Card fields *as long as the Problem is not submitted*. Changes are:
+In the Owner View, the Problem Owner (or Deputy) may edit all Problem Card fields *as long as the Problem is not submitted*. Changes are:
 
 - Persisted immediately on field modification
 - Not versioned until an explicit “New Version” action is taken
@@ -220,7 +230,7 @@ In the private view, the Problem Owner may edit all Problem Card fields *as long
 Once the Problem is submitted, all fields become read-only.
 
 ### Submission and Versioning Controls
-The private view exposes the following actions:
+The Owner View exposes the following actions:
 
 - **Submit Problem**  
   Transitions the Problem from draft to submitted state.
@@ -240,7 +250,7 @@ Problem Owners can manage resource lists:
 
 ### Assessment Access (Owner View)
 
-The private view displays the same **2×3 assessment grid** as the public view, with the following differences:
+The Owner View displays the same **2×3 assessment grid** as the public view, with the following differences:
 
 **Row 1 – Rate Buttons:**
 | Button | Behavior |
@@ -382,7 +392,7 @@ Each state badge is clickable/hoverable to show explanation:
 
 | Badge | Tooltip |
 |-------|---------|
-| `Draft` | "Problem is being authored. Only the PO can see it." |
+| `Draft` | "Problem is being authored. Only the PO and Deputy can edit." |
 | `Submitted` | "Submitted for review. Moderators will evaluate." |
 | `Needs Changes` | "Feedback received. PO should update and resubmit." |
 | `Ready` | "Quality gate passed! This problem can be pitched." |

@@ -111,3 +111,28 @@ Generate a frontend design for a this project
     **Accessibility**: All colors verified to meet WCAG AA contrast (4.5:1) with white text
     **Sizes**: sm (24px), md (36px), lg (48px)
     **Component**: `ui/initial-avatar/` (Ch.26.11.16)
+
+5. **Navigation Chrome** (Added 2026-02-25)
+
+    Global app chrome tokens for the Split Navigation pattern (Ch.12.7, Ch.26.16).
+
+    | Token | Value | Usage |
+    |-------|-------|-------|
+    | `--height-topbar-mobile` | **44px** | TopAppBar height on mobile |
+    | `--height-topbar-desktop` | **48px** | TopAppBar height on desktop |
+    | `--height-bottomnav-mobile` | **56px** | BottomNavBar height on mobile |
+    | `--height-bottomnav-desktop` | **60px** | BottomNavBar height on desktop |
+    | `--color-nav-active` | **#2680F1** | Active nav item (= `--color-primary`) |
+    | `--color-nav-inactive` | **#7B7C90** | Inactive nav item (= `--color-labels`) |
+    | `--shadow-nav` | **0px 1px 3px rgba(0,0,0,0.05)** | App bar shadow |
+
+    **Z-Index Layers** (navigation context):
+
+    | Z-Index | Component | Notes |
+    |---------|-----------|-------|
+    | `z-50` | TopAppBar | Fixed, topmost chrome |
+    | `z-50` | BottomNavBar | Fixed, bottom chrome |
+    | `z-40` | LiveBanner | Sticky, below TopAppBar |
+    | `z-30` | Modals/Sheets | AccountMenu, FilterBottomSheet |
+
+    **Safe Area**: BottomNavBar uses `pb-[env(safe-area-inset-bottom)]` for iPhone home indicator.

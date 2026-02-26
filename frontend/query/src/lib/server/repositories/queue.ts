@@ -1,5 +1,20 @@
 import { getDatabase, generateId, nowIso } from '../db';
 
+export interface AvailableProblem {
+	problem_id: string;
+	slug: string;
+	title: string;
+	owner_display_name: string;
+	current_readiness_state: string;
+	problem_type: string | null;
+	created_at: string;
+}
+
+export interface AvailableBacklogResult {
+	items: AvailableProblem[];
+	totalItems: number;
+}
+
 export interface QueueItem {
 	queue_id: string;
 	event_id: string;
@@ -194,4 +209,77 @@ export function reorderQueue(
 		console.error('Error reordering queue:', err);
 		return { success: false, error: err.message };
 	}
+}
+
+/**
+ * Gets available backlog problems (ready + backlog + not archived) with
+ * server-side search, filtering, and pagination.
+ * Spec: Ch.12.5, Ch.12.10, queue_planning_design.md §Data Requirements
+ */
+export function getAvailableBacklog(options: {
+	search?: string;
+	problemType?: string;
+	limit?: number;
+	offset?: number;
+}): AvailableBacklogResult {
+	const db = getDatabase();
+
+	const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+	const offset = Math.max(options.offset ?? 0, 0);
+
+	// Build WHERE conditions
+	const conditions: string[] = [
+		"p.current_readiness_state = 'ready'",
+		"p.current_action_state = 'backlog'",
+		'p.archived_at IS NULL'
+	];
+	const params: unknown[] = [];
+
+	// Search — title and owner display_name (COLLATE NOCASE)
+	if (options.search && options.search.length >= 2) {
+		conditions.push(
+			'(pv.title LIKE ? COLLATE NOCASE OR u.display_name LIKE ? COLLATE NOCASE)'
+		);
+		const like = `%${options.search}%`;
+		params.push(like, like);
+	}
+
+	// Problem type filter
+	if (options.problemType) {
+		conditions.push('p.problem_type = ?');
+		params.push(options.problemType);
+	}
+
+	const whereClause = 'WHERE ' + conditions.join(' AND ');
+
+	const baseFrom = `
+		FROM problems p
+		JOIN problem_versions pv ON p.problem_id = pv.problem_id AND pv.is_current = 1
+		JOIN users u ON p.created_by_user_id = u.user_id
+	`;
+
+	// Count query
+	const countRow = db
+		.prepare(`SELECT COUNT(*) as total ${baseFrom} ${whereClause}`)
+		.get(...params) as { total: number };
+
+	// Items query
+	const items = db
+		.prepare(
+			`SELECT
+				p.problem_id,
+				p.public_slug AS slug,
+				pv.title,
+				u.display_name AS owner_display_name,
+				p.current_readiness_state,
+				p.problem_type,
+				p.created_at
+			${baseFrom}
+			${whereClause}
+			ORDER BY p.created_at DESC
+			LIMIT ? OFFSET ?`
+		)
+		.all(...params, limit, offset) as AvailableProblem[];
+
+	return { items, totalItems: countRow.total };
 }

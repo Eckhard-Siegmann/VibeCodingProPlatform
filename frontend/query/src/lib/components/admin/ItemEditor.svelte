@@ -10,6 +10,7 @@
 	export interface ItemData {
 		item_id?: string;
 		item_key: string;
+		short_label: string;
 		item_text: string;
 		max_rating: number;
 		label_min: string;
@@ -20,6 +21,8 @@
 		category?: string;
 		internal_notes?: string;
 		is_active?: boolean;
+		created_at?: string;
+		retired_at?: string | null;
 	}
 
 	interface Props {
@@ -42,6 +45,7 @@
 
 	// Form state - initialized empty, populated by $effect below
 	let itemKey = $state('');
+	let shortLabel = $state('');
 	let itemText = $state('');
 	let maxRating = $state('5');
 	let labelMin = $state('');
@@ -59,6 +63,7 @@
 	$effect(() => {
 		if (open) {
 			itemKey = mode === 'clone' ? '' : (item?.item_key ?? '');
+			shortLabel = item?.short_label ?? '';
 			itemText = item?.item_text ?? '';
 			maxRating = item?.max_rating?.toString() ?? '5';
 			labelMin = item?.label_min ?? '';
@@ -111,6 +116,12 @@
 			newErrors.itemKey = 'Item key must start with lowercase letter and contain only lowercase letters, numbers, and underscores';
 		}
 
+		if (!shortLabel.trim()) {
+			newErrors.shortLabel = 'Short label is required';
+		} else if (shortLabel.trim().length > 30) {
+			newErrors.shortLabel = 'Short label must be 30 characters or fewer';
+		}
+
 		if (!itemText.trim()) {
 			newErrors.itemText = 'Item text is required';
 		}
@@ -146,6 +157,7 @@
 		const itemData: ItemData = {
 			item_id: mode === 'edit' ? item?.item_id : undefined,
 			item_key: itemKey.trim(),
+			short_label: shortLabel.trim(),
 			item_text: itemText.trim(),
 			max_rating: parseInt(maxRating),
 			label_min: labelMin.trim(),
@@ -210,6 +222,35 @@
 			{/if}
 			<p class="text-xs text-meta">
 				Unique identifier. Use lowercase with underscores (e.g., test_support).
+			</p>
+		</div>
+
+		<!-- Short Label -->
+		<div class="space-y-1.5">
+			<label for="short-label" class="block text-sm font-medium text-headers">
+				Short Label
+			</label>
+			<input
+				id="short-label"
+				type="text"
+				bind:value={shortLabel}
+				placeholder="e.g., Correctness, Test Support"
+				class={cn(
+					'w-full px-3 py-2 min-h-[44px]',
+					'bg-card border-2 rounded-[var(--radius-card)]',
+					'text-headers placeholder:text-meta',
+					'focus:outline-none focus:border-primary',
+					errors.shortLabel ? 'border-alert' : 'border-secondary'
+				)}
+			/>
+			{#if errors.shortLabel}
+				<p class="flex items-center gap-1 text-sm text-alert">
+					<AlertCircle class="w-4 h-4" />
+					{errors.shortLabel}
+				</p>
+			{/if}
+			<p class="text-xs text-meta">
+				Human-readable mnemonic (1-30 characters).
 			</p>
 		</div>
 

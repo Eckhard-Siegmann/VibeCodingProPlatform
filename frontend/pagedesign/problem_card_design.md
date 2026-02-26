@@ -99,8 +99,8 @@ Core UI for problem display with **role-based visibility**. The Problem Card is 
 
 ### Unique Visibility
 
-**What PO Sees (vs. Others)**:
-- ✅ Edit Mode Indicator banner ("You are the Problem Owner")
+**What PO/Deputy Sees (vs. Others)**:
+- ✅ Ownership Banner (blue for PO: "You are the Problem Owner", purple for Deputy: "You are the Deputy Problem Owner")
 - ✅ Best Practices Link (draft mode only)
 - ✅ Editable fields (draft mode only): Title, Description, Acceptance Criteria, Classification
 - ✅ Auto-save feedback on editable fields
@@ -400,8 +400,8 @@ const effectiveRole = isMemberOfThisProblem ? 'developer' : currentUser.role;
 ```
 PageContainer (three-layer depth)
 └─ ProblemCard
-   ├─ {#if isOwnerViewingDraft}
-   │  └─ PrivateWarningBanner ("You are the Problem Owner")
+   ├─ {#if isOwner || isDeputy}
+   │  └─ OwnerBanner (role='owner'|'deputy', readinessState)
    │
    ├─ {#if isOwnerAndDraft}
    │  └─ BestPracticesLink
@@ -555,7 +555,7 @@ PageContainer (three-layer depth)
    │           └─ {#if decision.rationale}
    │              └─ Rationale text (quoted)
    │
-   └─ {#if isOwner}
+   └─ {#if hasElevatedRights}
       └─ POActionBar (sticky bottom)
          └─ [Submit] | [Modify] [Clone]
 ```
@@ -742,16 +742,17 @@ export const load: PageServerLoad = async ({ params, url, locals }) => {
 **Flags Object**:
 ```typescript
 interface VisibilityFlags {
-  isOwner: boolean;
-  isDeputy: boolean;
+  isOwner: boolean;              // user is created_by_user_id
+  isDeputy: boolean;             // user is deputy_owner_user_id
+  hasElevatedRights: boolean;    // isOwner || isDeputy
   isTeamMember: boolean;
   isRetiredMember: boolean;
   isModerator: boolean;
   isAdmin: boolean;
-  canEdit: boolean;              // isOwner && readiness === 'draft'
-  canSubmit: boolean;            // isOwner && readiness === 'draft'
-  canModify: boolean;            // isOwner && readiness !== 'draft'
-  canSelfRate: boolean;          // isOwner
+  canEdit: boolean;              // hasElevatedRights && readiness === 'draft'
+  canSubmit: boolean;            // hasElevatedRights && readiness === 'draft'
+  canModify: boolean;            // hasElevatedRights && readiness !== 'draft'
+  canSelfRate: boolean;          // hasElevatedRights
   canRatePitch: boolean;         // pitch_assessment.is_open
   canRateReview: boolean;        // review_assessment.is_open
   canJoinTeam: boolean;          // !isMember && action === 'selected_for_coding' && event.isLive
@@ -967,9 +968,18 @@ CLOSED
 **Server Load**:
 - Single query loads problem + version + assessments + team + chat (initial 20 messages)
 - Computed flags on server (reduces client logic)
+- Server loader also fetches `getLiveContext(eventId)` and passes `liveContext` to the page (mode, timer, current problem)
+
+**Live Context Detection** (Ch.14, TICKET-27):
+
+The server loader calls `getLiveContext(eventId)` and passes the result to the page. The page uses this to:
+1. Determine the poll interval: **3s** if `liveContext.current_mode !== 'idle'`, **10s** otherwise
+2. Provide the `liveContext` to `ProblemCard` for dynamic live-awareness (e.g., showing "Pitch in progress" or "Review in progress" when the current problem is the one being presented)
+
+The `liveContext` data is refreshed on each `invalidateAll()` cycle (every poll tick), so the page stays in sync with moderator-driven mode transitions without a separate WebSocket.
 
 **Client Polling** (Ch.31.9):
-- Active event: Poll chat every 3 seconds
+- Active event (`current_mode !== 'idle'`): Poll every 3 seconds
 - No active event: Poll every 10 seconds
 - Tab not visible: Pause or 30 seconds
 
@@ -1179,6 +1189,7 @@ This pattern:
 
 | Template | Usage Count | Notes |
 |----------|-------------|-------|
+| **OwnerBanner** | 1 | PO/Deputy ownership indicator (blue/purple) |
 | **Card** | 6+ | All major sections wrapped in cards |
 | **Separator** | 5+ | Between major sections |
 | **Button** | 10+ | All actions (submit, modify, join, etc.) |

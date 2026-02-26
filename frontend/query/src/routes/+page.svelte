@@ -2,93 +2,11 @@
 	import PageContainer from '$lib/components/layout/PageContainer.svelte';
 	import { Card } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
-	import { EventGrid, type EventCardData } from '$lib/components/events';
-	import { ContributorWall, type Contributor } from '$lib/components/dashboard';
-	import { ArrowRight, Users, Zap, BookOpen, Code } from '@lucide/svelte';
+	import { EventGrid } from '$lib/components/events';
+	import { ContributorWall } from '$lib/components/dashboard';
+	import { ArrowRight, Zap, BookOpen, Code } from '@lucide/svelte';
 
-	// Demo data - in production this would come from page.server.ts
-	const upcomingEvents: EventCardData[] = [
-		{
-			id: 'evt-1',
-			slug: 'cologne-march-2026',
-			title: 'VibeCoding Professionals - Cologne',
-			description: 'Monthly meetup for AI-assisted coding',
-			startsAt: '2026-03-15T18:00:00',
-			plannedEndsAt: '2026-03-15T21:00:00',
-			location: { name: 'STARTPLATZ Koeln', city: 'Cologne' },
-			partner: { name: 'STARTPLATZ' },
-			capacity: 30,
-			registeredCount: 18,
-			waitlistCount: 0
-		},
-		{
-			id: 'evt-2',
-			slug: 'aachen-april-2026',
-			title: 'VibeCoding Professionals - Aachen',
-			description: 'Bring your problems, build solutions together',
-			startsAt: '2026-04-10T18:00:00',
-			plannedEndsAt: '2026-04-10T21:00:00',
-			location: { name: 'Digital Hub Aachen', city: 'Aachen' },
-			partner: { name: 'Digital Hub' },
-			capacity: 25,
-			registeredCount: 23,
-			waitlistCount: 2
-		}
-	];
-
-	const pastEvents: EventCardData[] = [
-		{
-			id: 'evt-past-1',
-			slug: 'cologne-february-2026',
-			title: 'VibeCoding Professionals - February',
-			startsAt: '2026-02-15T18:00:00',
-			location: { name: 'STARTPLATZ Koeln', city: 'Cologne' },
-			partner: { name: 'STARTPLATZ' },
-			capacity: 30,
-			registeredCount: 28,
-			isPast: true,
-			problemsCount: 5,
-			participantsCount: 28
-		}
-	];
-
-	const topContributors: Contributor[] = [
-		{
-			userId: 'user-1',
-			displayName: 'Eva Schmidt',
-			points: 42,
-			stars: 3,
-			contributionCount: 18
-		},
-		{
-			userId: 'user-2',
-			displayName: 'Max Mustermann',
-			points: 38,
-			stars: 2,
-			contributionCount: 15
-		},
-		{
-			userId: 'user-3',
-			displayName: 'Lisa Chen',
-			points: 35,
-			stars: 1,
-			contributionCount: 22
-		},
-		{
-			userId: 'user-4',
-			displayName: 'Tom Weber',
-			points: 31,
-			stars: 2,
-			contributionCount: 12
-		},
-		{
-			userId: 'user-5',
-			displayName: 'Anna Mueller',
-			points: 28,
-			stars: 0,
-			contributionCount: 19
-		}
-	];
+	let { data } = $props();
 </script>
 
 <svelte:head>
@@ -155,7 +73,7 @@
 
 	<!-- Upcoming Events -->
 	<EventGrid
-		events={upcomingEvents}
+		events={data.upcomingEvents}
 		title="Upcoming Events"
 		emptyTitle="No upcoming events"
 		emptyMessage="Check back soon for new events in Cologne and Aachen."
@@ -165,7 +83,7 @@
 
 	<!-- Past Events -->
 	<EventGrid
-		events={pastEvents}
+		events={data.pastEvents}
 		title="Past Events"
 		emptyTitle="No past events yet"
 		emptyMessage="Event history will appear here."
@@ -175,9 +93,11 @@
 	/>
 
 	<!-- Contributor Wall -->
-	<div class="py-8">
-		<ContributorWall contributors={topContributors} />
-	</div>
+	{#if data.topContributors.length > 0}
+		<div class="py-8">
+			<ContributorWall contributors={data.topContributors} />
+		</div>
+	{/if}
 
 	<!-- Demo Links (for development) -->
 	<section class="py-8 border-t border-secondary">

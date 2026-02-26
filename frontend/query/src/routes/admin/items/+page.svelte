@@ -1,9 +1,19 @@
+<!--
+  Admin Item Management — server-side pagination, search, filtering.
+  Spec: Ch.17.1, Ch.12.10 | Design: pagedesign/admin_interfaces_design.md | Ticket: TICKET-30
+-->
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/stores';
 	import { cn } from '$lib/utils';
-	import { Card, CardHeader, CardTitle, CardContent } from '$lib/components/ui/card';
+	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
-	import { DataTable, type TableColumn, type TableAction } from '$lib/components/ui/data-table';
+	import SearchBar from '$lib/components/ui/SearchBar.svelte';
+	import ListFilterBar from '$lib/components/ui/ListFilterBar.svelte';
+	import Pagination from '$lib/components/ui/Pagination.svelte';
+	import type { FilterConfig } from '$lib/components/ui/ListFilterBar.svelte';
+	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
 	import { ItemEditor, type ItemData } from '$lib/components/admin';
 	import Plus from '@lucide/svelte/icons/plus';
 	import Edit from '@lucide/svelte/icons/pencil';
@@ -11,191 +21,159 @@
 	import Archive from '@lucide/svelte/icons/archive';
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 
-	interface Props {
-		data?: {
-			items: ItemData[];
-		};
-	}
+	let { data } = $props();
 
-	let { data }: Props = $props();
-
-	// Demo items
-	const demoItems: (ItemData & { is_active: boolean; created_at: string })[] = [
-		{
-			item_id: '1',
-			item_key: 'correctness',
-			item_text: 'The solution meets the stated requirements (including edge cases) and behaves as intended.',
-			max_rating: 5,
-			label_min: 'Incorrect/misleading',
-			label_low_mid: 'Partly correct',
-			label_mid: 'Mostly correct',
-			label_high_mid: 'Minor issues',
-			label_max: 'Fully correct',
-			category: 'quality',
-			is_active: true,
-			created_at: '2026-01-15T10:00:00Z'
-		},
-		{
-			item_id: '2',
-			item_key: 'test_support',
-			item_text: 'The solution includes evidence (tests, examples, documentation) that convincingly demonstrates correctness.',
-			max_rating: 5,
-			label_min: 'No evidence',
-			label_low_mid: 'Minimal evidence',
-			label_mid: 'Some evidence',
-			label_high_mid: 'Good evidence',
-			label_max: 'Comprehensive evidence',
-			category: 'quality',
-			is_active: true,
-			created_at: '2026-01-15T10:05:00Z'
-		},
-		{
-			item_id: '3',
-			item_key: 'code_readability',
-			item_text: 'The code is easy to read and understand with clear naming, structure, and local reasoning.',
-			max_rating: 5,
-			label_min: 'Unreadable',
-			label_low_mid: 'Hard to read',
-			label_mid: 'Readable',
-			label_high_mid: 'Clear',
-			label_max: 'Crystal clear',
-			category: 'quality',
-			is_active: true,
-			created_at: '2026-01-15T10:10:00Z'
-		}
-	];
-
-	let items = $state(demoItems as ItemData[]);
-
-	// Sync from server data when available
-	$effect(() => {
-		if (data?.items) items = data.items;
-	});
+	let searchValue = $state(data.filters.search);
 
 	// Editor state
 	let editorOpen = $state(false);
 	let editorMode = $state<'create' | 'edit' | 'clone'>('create');
 	let selectedItem = $state<ItemData | null>(null);
 
-	// Show retired items
-	let showRetired = $state(false);
+	// Retire confirmation state
+	let retireConfirmOpen = $state(false);
+	let retireTarget = $state<ItemData | null>(null);
+	let retireError = $state('');
 
-	// Filtered items
-	const filteredItems = $derived(() => {
-		if (showRetired) {
-			return items;
+	// Status message
+	let statusMessage = $state('');
+
+	// Filter configuration
+	const filterConfig: FilterConfig[] = [
+		{
+			key: 'status',
+			label: 'Status',
+			options: [
+				{ value: 'all', label: 'All Items' },
+				{ value: 'active', label: 'Active' },
+				{ value: 'retired', label: 'Retired' }
+			],
+			defaultValue: 'all'
+		},
+		{
+			key: 'sort',
+			label: 'Sort',
+			options: [
+				{ value: 'default', label: 'Active First' },
+				{ value: 'key_asc', label: 'Key A–Z' },
+				{ value: 'key_desc', label: 'Key Z–A' },
+				{ value: 'newest', label: 'Newest First' },
+				{ value: 'oldest', label: 'Oldest First' }
+			],
+			defaultValue: 'default'
 		}
-		return items.filter((item) => item.is_active !== false);
-	});
+	];
 
-	// Format date
-	function formatDate(isoString: string): string {
-		return new Date(isoString).toLocaleDateString('en-GB', {
-			day: '2-digit',
-			month: 'short',
-			year: 'numeric'
+	// URL state management
+	function updateUrl(params: Record<string, string>, options?: { resetPage?: boolean; pushState?: boolean }) {
+		const url = new URL($page.url);
+		for (const [key, value] of Object.entries(params)) {
+			if (value && value !== 'all' && value !== 'default' && value !== '1' && value !== '') {
+				url.searchParams.set(key, value);
+			} else {
+				url.searchParams.delete(key);
+			}
+		}
+		if (options?.resetPage) {
+			url.searchParams.delete('page');
+		}
+		goto(url.pathname + url.search, {
+			replaceState: !options?.pushState,
+			keepFocus: true,
+			noScroll: true
 		});
 	}
 
-	// Table columns
-	const columns: TableColumn<ItemData>[] = [
-		{
-			key: 'item_key',
-			header: 'Key',
-			primary: true
-		},
-		{
-			key: 'item_text',
-			header: 'Question',
-			accessor: (row) => row.item_text.slice(0, 60) + (row.item_text.length > 60 ? '...' : '')
-		},
-		{
-			key: 'max_rating',
-			header: 'Scale',
-			accessor: (row) => `${row.max_rating}-point`
-		},
-		{
-			key: 'category',
-			header: 'Category',
-			hideInCard: true
-		},
-		{
-			key: 'is_active',
-			header: 'Status',
-			render: statusSnippet
-		}
-	];
+	function handleSearch(query: string) {
+		updateUrl({ search: query }, { resetPage: true });
+	}
 
-	// Table actions
-	const actions: TableAction<ItemData>[] = [
-		{
-			label: 'Edit',
-			icon: editIconSnippet,
-			onclick: (row) => openEditor('edit', row)
-		},
-		{
-			label: 'Clone',
-			icon: cloneIconSnippet,
-			onclick: (row) => openEditor('clone', row)
-		},
-		{
-			label: 'Retire',
-			icon: archiveIconSnippet,
-			onclick: (row) => handleRetire(row),
-			variant: 'destructive',
-			hidden: (row) => row.is_active === false
-		}
-	];
+	function handleFilterChange(key: string, value: string) {
+		updateUrl({ [key]: value }, { resetPage: true });
+	}
 
-	// Open editor
+	function handleClearAll() {
+		searchValue = '';
+		goto('/admin/items', { replaceState: true });
+	}
+
+	function handlePageChange(newPage: number) {
+		updateUrl({ page: String(newPage) }, { pushState: true });
+	}
+
+	// Editor
 	function openEditor(mode: 'create' | 'edit' | 'clone', item?: ItemData) {
 		editorMode = mode;
 		selectedItem = item ?? null;
 		editorOpen = true;
 	}
 
-	// Handle save
 	async function handleSave(itemData: ItemData) {
-		console.log('Saving item:', itemData);
-		// In production, this would call the API
-		editorOpen = false;
+		try {
+			let res: Response;
+
+			if (editorMode === 'edit' && itemData.item_id) {
+				res = await fetch(`/api/admin/items/${itemData.item_id}`, {
+					method: 'PUT',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(itemData)
+				});
+			} else {
+				res = await fetch('/api/admin/items', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(itemData)
+				});
+			}
+
+			const result = await res.json();
+			if (!res.ok) {
+				statusMessage = `Error: ${result.message ?? result.error ?? 'Failed to save item'}`;
+				return;
+			}
+
+			editorOpen = false;
+			statusMessage = editorMode === 'edit'
+				? 'Item updated (old version retired, new version created)'
+				: 'Item created successfully';
+			goto($page.url.pathname + $page.url.search, { invalidateAll: true });
+		} catch (err) {
+			statusMessage = `Error: ${err instanceof Error ? err.message : 'Unknown error'}`;
+		}
 	}
 
-	// Handle retire
-	async function handleRetire(item: ItemData) {
-		console.log('Retiring item:', item.item_key);
-		// In production, this would call the API
+	// Retire
+	function confirmRetire(item: ItemData) {
+		retireTarget = item;
+		retireError = '';
+		retireConfirmOpen = true;
 	}
+
+	async function handleRetire() {
+		if (!retireTarget?.item_id) return;
+
+		try {
+			const res = await fetch(`/api/admin/items/${retireTarget.item_id}`, { method: 'DELETE' });
+			const result = await res.json();
+			if (!res.ok) {
+				retireError = result.message ?? result.error ?? 'Failed to retire item';
+				return;
+			}
+
+			retireConfirmOpen = false;
+			statusMessage = `Item "${retireTarget.item_key}" retired successfully`;
+			goto($page.url.pathname + $page.url.search, { invalidateAll: true });
+		} catch (err) {
+			retireError = err instanceof Error ? err.message : 'Unknown error';
+		}
+	}
+
+	const hasActiveFilters = $derived(
+		data.filters.search !== '' ||
+		data.filters.status !== 'all' ||
+		data.filters.sort !== 'default'
+	);
 </script>
-
-{#snippet statusSnippet({ value, row }: { value: unknown; row: ItemData })}
-	{#if row.is_active !== false}
-		<Badge variant="ready">Active</Badge>
-	{:else}
-		<Badge variant="draft">Retired</Badge>
-	{/if}
-{/snippet}
-
-{#snippet editIconSnippet()}
-	<Edit class="w-4 h-4" />
-{/snippet}
-
-{#snippet cloneIconSnippet()}
-	<Copy class="w-4 h-4" />
-{/snippet}
-
-{#snippet archiveIconSnippet()}
-	<Archive class="w-4 h-4" />
-{/snippet}
-
-{#snippet emptyStateSnippet()}
-	<div class="py-12 text-center">
-		<p class="text-meta">No items found.</p>
-		<Button variant="default" onclick={() => openEditor('create')} class="mt-4">
-			Create your first item
-		</Button>
-	</div>
-{/snippet}
 
 <svelte:head>
 	<title>Item Management | Admin | VibeCoding</title>
@@ -219,19 +197,24 @@
 				</div>
 			</div>
 
-			<div class="flex gap-2">
-				<Button
-					variant="secondary"
-					onclick={() => showRetired = !showRetired}
-				>
-					{showRetired ? 'Hide Retired' : 'Show Retired'}
-				</Button>
-				<Button variant="default" onclick={() => openEditor('create')}>
-					<Plus class="w-4 h-4 mr-2" />
-					Create Item
-				</Button>
-			</div>
+			<Button variant="default" onclick={() => openEditor('create')}>
+				<Plus class="w-4 h-4 mr-2" />
+				Create Item
+			</Button>
 		</div>
+
+		<!-- Status Message -->
+		{#if statusMessage}
+			<div class={cn(
+				'mb-4 p-3 rounded-[var(--radius-card)] text-sm',
+				statusMessage.startsWith('Error')
+					? 'bg-alert/10 text-alert border border-alert/20'
+					: 'bg-success/10 text-success border border-success/20'
+			)}>
+				{statusMessage}
+				<button class="float-right font-bold" onclick={() => statusMessage = ''}>×</button>
+			</div>
+		{/if}
 
 		<!-- Info Card -->
 		<Card elevation="resting" class="mb-6">
@@ -243,18 +226,150 @@
 			</CardContent>
 		</Card>
 
-		<!-- Items Table -->
+		<!-- Search + Filters -->
+		<div class="space-y-3 mb-6">
+			<SearchBar
+				bind:value={searchValue}
+				placeholder="Search by key or label…"
+				onSearch={handleSearch}
+				class="w-full md:w-80"
+			/>
+			<ListFilterBar
+				filters={filterConfig}
+				values={data.filters}
+				onFilterChange={handleFilterChange}
+				showClearAll={true}
+				onClearAll={handleClearAll}
+				class="overflow-x-auto md:overflow-visible flex-nowrap md:flex-wrap"
+			/>
+		</div>
+
+		<!-- Results count -->
+		{#if data.items.length > 0}
+			<p class="text-sm text-labels mb-4" aria-live="polite">
+				Showing {(data.pagination.page - 1) * data.pagination.pageSize + 1}–{Math.min(data.pagination.page * data.pagination.pageSize, data.pagination.totalItems)} of {data.pagination.totalItems} item{data.pagination.totalItems !== 1 ? 's' : ''}
+			</p>
+		{/if}
+
+		<!-- Items List -->
 		<Card elevation="resting">
 			<CardContent>
-				<DataTable
-					data={filteredItems()}
-					{columns}
-					{actions}
-					sortable
-					emptyState={emptyStateSnippet}
-				/>
+				{#if data.items.length > 0}
+					<!-- Desktop: table -->
+					<div class="hidden md:block overflow-x-auto">
+						<table class="w-full text-sm">
+							<thead>
+								<tr class="border-b border-secondary">
+									<th class="text-left py-3 px-2 text-labels font-medium">Key</th>
+									<th class="text-left py-3 px-2 text-labels font-medium">Label</th>
+									<th class="text-left py-3 px-2 text-labels font-medium">Question</th>
+									<th class="text-left py-3 px-2 text-labels font-medium">Scale</th>
+									<th class="text-left py-3 px-2 text-labels font-medium">Status</th>
+									<th class="py-3 px-2"></th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each data.items as item (item.item_id)}
+									<tr class="border-b border-secondary/50 hover:bg-canvas/50 transition-colors">
+										<td class="py-3 px-2 font-medium text-headers font-mono text-xs">{item.item_key}</td>
+										<td class="py-3 px-2 text-body">{item.short_label}</td>
+										<td class="py-3 px-2 text-body max-w-xs truncate">{item.item_text.slice(0, 60)}{item.item_text.length > 60 ? '…' : ''}</td>
+										<td class="py-3 px-2 text-labels">{item.max_rating}-point</td>
+										<td class="py-3 px-2">
+											{#if item.is_active}
+												<Badge variant="ready">Active</Badge>
+											{:else}
+												<Badge variant="draft">Retired</Badge>
+											{/if}
+										</td>
+										<td class="py-3 px-2">
+											<div class="flex items-center gap-1">
+												<button
+													onclick={() => openEditor('edit', item)}
+													class="p-1.5 rounded hover:bg-canvas text-labels hover:text-headers transition-colors"
+													title="Edit"
+												>
+													<Edit class="w-4 h-4" />
+												</button>
+												<button
+													onclick={() => openEditor('clone', item)}
+													class="p-1.5 rounded hover:bg-canvas text-labels hover:text-headers transition-colors"
+													title="Clone"
+												>
+													<Copy class="w-4 h-4" />
+												</button>
+												{#if item.is_active}
+													<button
+														onclick={() => confirmRetire(item)}
+														class="p-1.5 rounded hover:bg-canvas text-labels hover:text-alert transition-colors"
+														title="Retire"
+													>
+														<Archive class="w-4 h-4" />
+													</button>
+												{/if}
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+
+					<!-- Mobile: cards -->
+					<div class="md:hidden space-y-3">
+						{#each data.items as item (item.item_id)}
+							<div class="p-3 rounded-[var(--radius-card)] border border-secondary/50">
+								<div class="flex items-start justify-between gap-2">
+									<div class="min-w-0">
+										<p class="font-mono text-xs font-medium text-headers">{item.item_key}</p>
+										<p class="text-sm text-body">{item.short_label}</p>
+									</div>
+									<div class="flex items-center gap-1 flex-shrink-0">
+										<button onclick={() => openEditor('edit', item)} class="p-2 rounded hover:bg-canvas text-labels" title="Edit">
+											<Edit class="w-4 h-4" />
+										</button>
+										<button onclick={() => openEditor('clone', item)} class="p-2 rounded hover:bg-canvas text-labels" title="Clone">
+											<Copy class="w-4 h-4" />
+										</button>
+									</div>
+								</div>
+								<div class="flex items-center gap-2 mt-2">
+									{#if item.is_active}
+										<Badge variant="ready">Active</Badge>
+									{:else}
+										<Badge variant="draft">Retired</Badge>
+									{/if}
+									<span class="text-xs text-labels">{item.max_rating}-point scale</span>
+								</div>
+							</div>
+						{/each}
+					</div>
+				{:else if hasActiveFilters}
+					<div class="py-12 text-center">
+						<p class="text-meta">No items match your current filters.</p>
+						<p class="text-sm text-meta mt-1">
+							<button type="button" class="text-primary underline" onclick={handleClearAll}>Clear all filters</button>
+						</p>
+					</div>
+				{:else}
+					<div class="py-12 text-center">
+						<p class="text-meta">No items found.</p>
+						<Button variant="default" onclick={() => openEditor('create')} class="mt-4">
+							Create your first item
+						</Button>
+					</div>
+				{/if}
 			</CardContent>
 		</Card>
+
+		<!-- Pagination -->
+		<Pagination
+			page={data.pagination.page}
+			pageSize={data.pagination.pageSize}
+			totalItems={data.pagination.totalItems}
+			totalPages={data.pagination.totalPages}
+			onPageChange={handlePageChange}
+		/>
 	</div>
 </div>
 
@@ -266,3 +381,18 @@
 	onSave={handleSave}
 	onCancel={() => editorOpen = false}
 />
+
+<!-- Retire Confirmation Dialog -->
+{#if retireTarget}
+	<ConfirmDialog
+		bind:open={retireConfirmOpen}
+		title="Retire Item"
+		message={retireError
+			? `Are you sure you want to retire "${retireTarget.item_key}"?\n\n${retireError}`
+			: `Are you sure you want to retire "${retireTarget.item_key}"? This item will no longer be available for new inventories.`}
+		confirmLabel="Retire"
+		variant="danger"
+		onConfirm={handleRetire}
+		onCancel={() => retireConfirmOpen = false}
+	/>
+{/if}

@@ -7,6 +7,7 @@
 	import FileText from '@lucide/svelte/icons/file-text';
 	import Layers from '@lucide/svelte/icons/layers';
 	import Building from '@lucide/svelte/icons/building';
+	import Settings from '@lucide/svelte/icons/settings';
 	import CheckCircle from '@lucide/svelte/icons/check-circle';
 	import AlertCircle from '@lucide/svelte/icons/alert-circle';
 	import Clock from '@lucide/svelte/icons/clock';
@@ -79,6 +80,22 @@
 			description: 'Assemble and manage inventories',
 			href: '/admin/inventories',
 			icon: Layers,
+			stat: null,
+			statLabel: null
+		},
+		{
+			title: 'Partners & Locations',
+			description: 'Manage partner organizations, locations, and rooms',
+			href: '/admin/infrastructure',
+			icon: Building,
+			stat: null,
+			statLabel: null
+		},
+		{
+			title: 'Catalogs & Weights',
+			description: 'Manage vocabularies and scoring weights',
+			href: '/admin/catalogs',
+			icon: Settings,
 			stat: null,
 			statLabel: null
 		}

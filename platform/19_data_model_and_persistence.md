@@ -25,6 +25,16 @@ The database is a relational SQL database. Engine selection is an architectural 
 
 Controlled vocabularies are implemented as **reference tables with VARCHAR primary keys** rather than database-engine-specific enum types (see ADR 001). This enables adding new values without schema migration.
 
+**Admin-Tunability Classification** (see Chapter 17.10 for full specification):
+
+| Classification | Catalogs | Admin Runtime Management |
+|---------------|----------|--------------------------|
+| **Soft catalogs** | `problem_type_catalog`, `emoji_catalog`, `lesson_category_catalog` | Add entries, edit display metadata, toggle active/inactive |
+| **Weight catalogs** | `contribution_action_catalog`, `review_weight_catalog` | Edit weight values, toggle active/inactive |
+| **Structural catalogs** | All others (readiness states, action states, decision types, time contexts, user roles, auth providers, team roles/statuses, queue states, chat contexts, resource types, partner types, milestones, hints) | Not admin-manageable — changes require coordinated spec, seed data, and frontend constant updates |
+
+Soft and weight catalogs are safe for runtime management because they do not drive state machines, authorization logic, or assessment lifecycles.
+
 ### 19.2.1 `readiness_state_catalog`
 
 Defines the **intrinsic quality states** of a Problem Card.
@@ -347,6 +357,7 @@ Unified table for **all actors**: human participants, moderators, administrators
 | `email_confirm_expires_at` | TIMESTAMP | nullable | 24h validity |
 | `otp_hash` | VARCHAR | nullable | One-time password hash |
 | `otp_is_initial` | BOOLEAN | NOT NULL, default FALSE | Must change on first login |
+| `login_enabled` | BOOLEAN | NOT NULL, default FALSE | FALSE until password set; self-registration sets TRUE immediately |
 | `get_infoletter` | BOOLEAN | NOT NULL, default TRUE | Newsletter subscription |
 | `terms_accepted_at` | TIMESTAMP | nullable | When T&C were accepted |
 | `show_on_contributor_wall` | BOOLEAN | NOT NULL, default TRUE | Opt-out from public contributor wall (Chapter 33) |
@@ -386,12 +397,34 @@ ALTER TABLE users ADD COLUMN audio_cues_enabled INTEGER NOT NULL DEFAULT 0;
 
 ---
 
-### 19.3.2 `sessions` *(REMOVED)*
+### 19.3.2 `user_sessions`
 
-> **REMOVED**: This table has been eliminated. All participation requires mandatory authentication (Chapter 18).
->
-> All responses are now directly linked to authenticated users via `user_id NOT NULL` in the `responses` table.
-> The system no longer supports pseudonymous or unauthenticated participation.
+Stores active authentication sessions for logged-in users. Each login creates a session row; the raw token is sent as an HTTP-only cookie and only the SHA-256 hash is stored server-side (see ADR 007).
+
+> **History**: The original `sessions` table (pseudonymous participation tokens) was removed when mandatory authentication was introduced. This `user_sessions` table serves a different purpose: authenticated session management.
+
+**Columns**
+
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `session_id` | UUID | PK | |
+| `user_id` | UUID | FK → users, NOT NULL | |
+| `token_hash` | VARCHAR(64) | UNIQUE, NOT NULL | SHA-256 hash of raw session token |
+| `expires_at` | TIMESTAMP | nullable | NULL = browser session; set = "remember me" (30 days) |
+| `created_at` | TIMESTAMP | NOT NULL | Used for max lifetime check (90 days) |
+| `last_seen_at` | TIMESTAMP | NOT NULL | Updated on each validated request |
+| `user_agent` | VARCHAR | nullable | For "manage sessions" UI (identify devices) |
+
+**Indexes**
+- `UNIQUE INDEX ON token_hash` — primary lookup path (per-request validation)
+- `INDEX ON user_id` — "log out everywhere" and cleanup queries
+- `INDEX ON expires_at` — bulk cleanup of expired sessions
+
+**Invariants**
+- Raw session token is never stored — only the SHA-256 hash
+- Sessions are deleted (not soft-deleted) on logout, password change, or admin deactivation
+- Maximum session lifetime is 90 days from `created_at`, regardless of `expires_at`
+- Expired sessions are cleaned up lazily (on validation or login) — no background workers
 
 ---
 
@@ -468,6 +501,8 @@ Represents a **concrete event instance** (replaces the simpler `events` table). 
 | `x_post_url` | VARCHAR | nullable | X/Twitter announcement |
 | `image_url` | VARCHAR | nullable | Custom image (overrides auto-generated) |
 | `overbooking_factor` | DECIMAL(3,2) | NOT NULL, default 1.30 | e.g., 1.30 = 130% |
+| `reminder_due` | BOOLEAN | NOT NULL, default FALSE | Set TRUE by cron tick when `starts_at - 24h` is reached (ADR 010) |
+| `reminder_sent_at` | TIMESTAMP | nullable | When the moderator-initiated broadcast was dispatched |
 | `created_at` | TIMESTAMP | NOT NULL | |
 
 **Notes**
@@ -530,7 +565,69 @@ Tracks **actual attendance** for overbooking optimization.
 
 ---
 
-### 19.3.9 `event_live_context`
+### 19.3.9 `event_email_templates`
+
+Stores the **versioned email templates** for each event, specifically the Event Reminder / Invitation broadcast.
+
+**Columns**
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `template_id` | UUID | PK | |
+| `event_id` | UUID | FK → events, NOT NULL | |
+| `version` | INTEGER | NOT NULL, >= 1 | Monotonically increasing per event |
+| `subject` | VARCHAR | NOT NULL | Email subject line |
+| `body_markdown` | TEXT | NOT NULL | Email body content |
+| `created_at` | TIMESTAMP | NOT NULL | |
+| `created_by_user_id` | UUID | FK → users, NOT NULL | Author of this version |
+| `is_current` | BOOLEAN | NOT NULL | TRUE for the latest active version |
+
+**Constraints**
+- UNIQUE (`event_id`, `version`)
+- Exactly one `is_current = true` per `event_id`
+
+**Lifecycle / Versioning Rules**
+- **V1 Creation**: When an event is planned, V1 is automatically created by copying a system-wide default template.
+- **Editing**: Moderators edit the template in the UI. Saving creates a *new version* (e.g., V2) and sets its `is_current = true`, demoting the previous version.
+- **Dispatch**: Broadcasts and waitlist invitations *always* render the `body_markdown` of the version where `is_current = true` at the exact time of dispatch. Waitlist emails append a hardcoded 24h confirmation notice below this content.
+
+---
+
+### 19.3.10 `communications_log`
+
+Immutable audit trail of **all outbound communications and automated system actions** related to events. Exposed to moderators via a read-only log viewer (see ADR 010, User Story M17b).
+
+**Columns**
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `log_id` | UUID | PK | |
+| `event_id` | UUID | FK → events, NOT NULL | |
+| `type` | VARCHAR(30) | NOT NULL | e.g., `broadcast_manual`, `waitlist_invite`, `waitlist_expired`, `reminder_manual` |
+| `recipient_user_id` | UUID | FK → users, nullable | NULL for broadcast-to-all entries (logged once per dispatch, not per recipient) |
+| `recipient_count` | INTEGER | nullable | Number of recipients for broadcast-type entries |
+| `subject` | VARCHAR | nullable | Email subject line (if applicable) |
+| `body_preview` | TEXT | nullable | First 500 chars of rendered body for audit display |
+| `template_version` | INTEGER | nullable | Which `event_email_templates.version` was used |
+| `triggered_by` | VARCHAR(10) | NOT NULL, CHECK IN ('system', 'moderator') | Whether action was automated (cron tick) or human-initiated |
+| `triggered_by_user_id` | UUID | FK → users, nullable | The moderator who triggered, NULL for system actions |
+| `created_at` | TIMESTAMP | NOT NULL | When the action occurred |
+
+**Invariants**
+- This table is **append-only** — rows are never updated or deleted
+- Every automated waitlist action (expiration, invitation) generates exactly one log entry
+- Every moderator-initiated broadcast generates one log entry with `recipient_count`
+- The `template_version` links to the exact template content used at dispatch time
+
+**Type Values**
+| type | triggered_by | Description |
+|------|-------------|-------------|
+| `waitlist_invite` | system | Cron tick auto-invited next waitlist person |
+| `waitlist_expired` | system | Cron tick expired an unconfirmed invitation |
+| `reminder_manual` | moderator | Moderator sent the 24h event reminder broadcast |
+| `broadcast_manual` | moderator | Moderator sent a custom broadcast |
+
+---
+
+### 19.3.11 `event_live_context`
 
 Caches the **current live orchestration state** for an event. This is a derived/cached view, updated by triggers or application logic when live decisions are recorded.
 
@@ -570,7 +667,7 @@ Caches the **current live orchestration state** for an event. This is a derived/
 
 ---
 
-### 19.3.10 `problems`
+### 19.3.12 `problems`
 
 Represents the **identity of a problem across all versions**. Contains immutable identifiers plus cached state for efficient querying.
 
@@ -606,7 +703,7 @@ Represents the **identity of a problem across all versions**. Contains immutable
 
 ---
 
-### 19.3.11 `problem_versions`
+### 19.3.13 `problem_versions`
 
 Stores **major versions** of a Problem Card. Exactly one version per problem is current at any time.
 
@@ -633,7 +730,7 @@ Stores **major versions** of a Problem Card. Exactly one version per problem is 
 
 ---
 
-### 19.3.12 `problem_repo_snapshots`
+### 19.3.14 `problem_repo_snapshots`
 
 Maps **GitHub head commits to minor versions** within a given major version.
 
@@ -658,7 +755,7 @@ Maps **GitHub head commits to minor versions** within a given major version.
 
 ---
 
-### 19.3.13 `inventories`
+### 19.3.15 `inventories`
 
 Defines a reusable **evaluation instrument**.
 
@@ -666,16 +763,21 @@ Defines a reusable **evaluation instrument**.
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | `inventory_id` | UUID | PK | |
-| `inventory_key` | VARCHAR | UNIQUE, NOT NULL | Human-readable identifier |
+| `inventory_key` | VARCHAR | NOT NULL | Human-readable identifier (unique among active) |
 | `name` | VARCHAR | NOT NULL | |
 | `description` | TEXT | nullable | |
 | `is_active` | BOOLEAN | NOT NULL, default TRUE | |
 | `created_at` | TIMESTAMP | NOT NULL | |
 | `retired_at` | TIMESTAMP | nullable | |
 
+**Invariants**
+- At most one active inventory per `inventory_key` (enforced via partial unique index `WHERE retired_at IS NULL`)
+- Changes require retiring the old inventory and creating a new one with the same `inventory_key` (mirroring the items versioning pattern, see Ch.17.1)
+- Existing assessments remain linked to the historical inventory version via `inventory_id`
+
 ---
 
-### 19.3.14 `items`
+### 19.3.16 `items`
 
 Defines **immutable evaluation items**.
 
@@ -692,6 +794,8 @@ Defines **immutable evaluation items**.
 | `label_mid` | VARCHAR | nullable | |
 | `label_high_mid` | VARCHAR | nullable | For 5-point scales |
 | `label_max` | VARCHAR | nullable | |
+| `category` | VARCHAR | nullable | Administrative grouping (e.g., quality, clarity, engagement) |
+| `internal_notes` | TEXT | nullable | Optional notes for administrators about usage or interpretation |
 | `created_at` | TIMESTAMP | NOT NULL | |
 | `retired_at` | TIMESTAMP | nullable | |
 
@@ -705,7 +809,7 @@ Defines **immutable evaluation items**.
 
 ---
 
-### 19.3.15 `inventory_items`
+### 19.3.17 `inventory_items`
 
 Defines the **composition and order** of an inventory.
 
@@ -726,7 +830,7 @@ Defines the **composition and order** of an inventory.
 
 ---
 
-### 19.3.16 `assessments`
+### 19.3.18 `assessments`
 
 Represents one application of an inventory to a problem.
 
@@ -744,7 +848,7 @@ Represents one application of an inventory to a problem.
 
 ---
 
-### 19.3.17 `responses`
+### 19.3.19 `responses`
 
 Stores **atomic answers to items**, with full contextual metadata per response.
 
@@ -775,7 +879,7 @@ Stores **atomic answers to items**, with full contextual metadata per response.
 
 ---
 
-### 19.3.18 `decisions`
+### 19.3.20 `decisions`
 
 Canonical **event log** for all decisions, recommendations, and state transitions. This table serves as the activity log for the entire system.
 
@@ -800,7 +904,7 @@ Canonical **event log** for all decisions, recommendations, and state transition
 
 ---
 
-### 19.3.19 `event_problem_queue`
+### 19.3.21 `event_problem_queue`
 
 Associates problems with events for **backlog management and sprint planning**.
 
@@ -834,7 +938,7 @@ Queue removal is performed within the same transaction as the decision recording
 
 ---
 
-### 19.3.20 `problem_teams`
+### 19.3.22 `problem_teams`
 
 Represents a **team formed around a problem** at a specific event. Created when participants click "Challenge accepted" on a Problem Card.
 
@@ -856,7 +960,7 @@ Represents a **team formed around a problem** at a specific event. Created when 
 
 ---
 
-### 19.3.21 `problem_team_members`
+### 19.3.23 `problem_team_members`
 
 Tracks **membership** in problem teams with **version-scoped onboarding**.
 
@@ -908,7 +1012,7 @@ Tracks **membership** in problem teams with **version-scoped onboarding**.
 
 ---
 
-### 19.3.22 `problem_resources`
+### 19.3.24 `problem_resources`
 
 Tracks **URLs and resources** associated with problems. Supports two lists: directly relevant resources and helpful artifacts.
 
@@ -932,7 +1036,7 @@ Tracks **URLs and resources** associated with problems. Supports two lists: dire
 
 ---
 
-### 19.3.23 `chat_messages`
+### 19.3.25 `chat_messages`
 
 Stores **atomic chat messages** with rich contextual metadata.
 
@@ -1009,7 +1113,7 @@ Stores **atomic chat messages** with rich contextual metadata.
 
 ---
 
-### 19.3.24 `chat_mentions`
+### 19.3.26 `chat_mentions`
 
 Tracks **@mentions** in chat messages for notifications.
 
@@ -1025,7 +1129,7 @@ Tracks **@mentions** in chat messages for notifications.
 
 ---
 
-### 19.3.25 `chat_reactions`
+### 19.3.27 `chat_reactions`
 
 Tracks **emoji reactions** on chat messages.
 
@@ -1043,7 +1147,7 @@ Tracks **emoji reactions** on chat messages.
 
 ---
 
-### 19.3.26 `emoji_catalog`
+### 19.3.28 `emoji_catalog`
 
 **Curated set of 10 emojis** for reactions (see Chapter 31.4 for rationale).
 
@@ -1076,7 +1180,7 @@ Tracks **emoji reactions** on chat messages.
 
 ---
 
-### 19.3.27 `lessons_learned`
+### 19.3.29 `lessons_learned`
 
 Captures **structured insights** from working on problems. Unlike chat messages (chronological flow), lessons learned are curated, categorized knowledge artifacts.
 
@@ -1116,7 +1220,7 @@ Captures **structured insights** from working on problems. Unlike chat messages 
 
 ---
 
-### 19.3.28 `lesson_category_catalog`
+### 19.3.30 `lesson_category_catalog`
 
 Reference table for predefined lesson categories.
 
@@ -1132,7 +1236,7 @@ Reference table for predefined lesson categories.
 
 ---
 
-### 19.3.29 `problem_type_catalog`
+### 19.3.31 `problem_type_catalog`
 
 Reference table for problem classification types.
 
@@ -1158,7 +1262,7 @@ Reference table for problem classification types.
 
 ---
 
-### 19.3.30 `team_member_role_catalog`
+### 19.3.32 `team_member_role_catalog`
 
 Reference table for team member roles.
 
@@ -1181,7 +1285,7 @@ Reference table for team member roles.
 
 ---
 
-### 19.3.31 `team_member_status_catalog`
+### 19.3.33 `team_member_status_catalog`
 
 Reference table for team membership status.
 
@@ -1203,7 +1307,7 @@ Reference table for team membership status.
 
 ---
 
-### 19.3.32 `contribution_action_catalog`
+### 19.3.34 `contribution_action_catalog`
 
 Reference table for **point-earning actions** in the contributor recognition system. Weights are admin-configurable.
 
@@ -1238,7 +1342,7 @@ Reference table for **point-earning actions** in the contributor recognition sys
 
 ---
 
-### 19.3.33 `contribution_points`
+### 19.3.35 `contribution_points`
 
 **Append-only ledger** of points awarded to users. Each row represents one point-earning event.
 
@@ -1273,7 +1377,7 @@ Reference table for **point-earning actions** in the contributor recognition sys
 
 ---
 
-### 19.3.34 `star_awards`
+### 19.3.36 `star_awards`
 
 Tracks **hacking excellence awards** (1st, 2nd, 3rd place) for best solutions per problem per event.
 
@@ -1309,7 +1413,7 @@ Tracks **hacking excellence awards** (1st, 2nd, 3rd place) for best solutions pe
 
 ---
 
-### 19.3.35 `review_weight_catalog`
+### 19.3.37 `review_weight_catalog`
 
 Reference table for **review weightings** used in star award calculations. Different review contexts have different authority.
 
@@ -1337,10 +1441,11 @@ Reference table for **review weightings** used in star award calculations. Diffe
 
 ---
 
-### 19.3.36 `contributor_wall_6week` (View)
+### 19.3.38 `contributor_wall_6week` (View)
 
 **Aggregation view** for the public contributor wall. Shows top-10 contributors over a rolling 6-week window.
 
+**PostgreSQL:**
 ```sql
 CREATE VIEW contributor_wall_6week AS
 SELECT
@@ -1360,6 +1465,26 @@ ORDER BY total_points DESC, contribution_count DESC
 LIMIT 10;
 ```
 
+**SQLite equivalent** (per ADR 001 dual-engine strategy):
+```sql
+CREATE VIEW contributor_wall_6week AS
+SELECT
+  u.user_id,
+  u.display_name,
+  COALESCE(SUM(cp.points_awarded), 0) AS total_points,
+  COALESCE(SUM(sa.stars_awarded), 0) AS total_stars,
+  COUNT(DISTINCT cp.contribution_id) AS contribution_count
+FROM users u
+LEFT JOIN contribution_points cp ON u.user_id = cp.user_id
+  AND cp.awarded_at >= datetime('now', '-42 days')
+LEFT JOIN star_awards sa ON u.user_id = sa.user_id
+  AND sa.awarded_at >= datetime('now', '-42 days')
+WHERE u.show_on_contributor_wall = 1
+GROUP BY u.user_id, u.display_name
+ORDER BY total_points DESC, contribution_count DESC
+LIMIT 10;
+```
+
 **Sorting Logic**
 1. Primary: `total_points` descending
 2. Tie-breaker: `contribution_count` descending (more contributions wins)
@@ -1371,7 +1496,34 @@ LIMIT 10;
 
 ---
 
-### 19.3.37 `user_milestones`
+### 19.3.39 `milestone_key_catalog`
+
+Reference table for **milestone types** used in the milestone recognition system (Chapter 33.2). Follows the VARCHAR + FK pattern used by all catalog tables.
+
+**Columns**
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `milestone_key` | VARCHAR(50) | PK | Canonical identifier |
+| `display_name` | VARCHAR(60) | NOT NULL | Human-readable label |
+| `description` | TEXT | nullable | What triggers this milestone |
+| `context_type` | VARCHAR(30) | nullable | Type of context entity ('problem', 'event', 'team', or NULL) |
+| `is_active` | BOOLEAN | NOT NULL, default TRUE | Can be disabled |
+| `created_at` | TIMESTAMP | NOT NULL | |
+
+**Seed Data**
+| milestone_key | display_name | context_type | description |
+|---------------|--------------|--------------|-------------|
+| `first_problem_submitted` | First Problem Submitted | problem | First problem submitted for review |
+| `first_problem_accepted` | First Problem Accepted | problem | First problem passed quality gate |
+| `first_assessment_completed` | First Assessment Completed | NULL | First pitch or review assessment completed |
+| `first_team_joined` | First Team Joined | team | First team membership |
+| `first_event_attended` | First Event Attended | event | First event with confirmed attendance |
+| `first_lesson_learned` | First Lesson Learned | NULL | First lesson learned added |
+| `first_star_earned` | First Star Earned | problem | First star award received |
+
+---
+
+### 19.3.40 `user_milestones`
 
 Tracks **first-time achievements** for milestone recognition (Chapter 33). Used to trigger celebration moments and avoid repeated notifications.
 
@@ -1380,7 +1532,7 @@ Tracks **first-time achievements** for milestone recognition (Chapter 33). Used 
 |--------|------|-------------|-------|
 | `milestone_id` | UUID | PK | |
 | `user_id` | UUID | FK → users, NOT NULL | Who achieved the milestone |
-| `milestone_key` | VARCHAR(50) | NOT NULL | Milestone type identifier |
+| `milestone_key` | VARCHAR(50) | FK → milestone_key_catalog, NOT NULL | Milestone type identifier |
 | `achieved_at` | TIMESTAMP | NOT NULL | When milestone was achieved |
 | `context_id` | UUID | nullable | Related entity (problem_id, event_id, etc.) |
 | `context_type` | VARCHAR(30) | nullable | Type of context ('problem', 'event', 'team') |
@@ -1412,7 +1564,34 @@ VALUES (?, ?, 'first_problem_submitted', NOW(), ?, 'problem');
 
 ---
 
-### 19.3.38 `user_hint_dismissals`
+### 19.3.40 `hint_key_catalog`
+
+Reference table for **onboarding hint types** used in the hint dismissal system (Chapter 32). Follows the VARCHAR + FK pattern used by all catalog tables.
+
+**Columns**
+| Column | Type | Constraints | Notes |
+|--------|------|-------------|-------|
+| `hint_key` | VARCHAR(50) | PK | Canonical identifier |
+| `display_name` | VARCHAR(60) | NOT NULL | Human-readable label |
+| `description` | TEXT | nullable | What this hint explains |
+| `where_shown` | TEXT | nullable | Location in UI where hint appears |
+| `is_active` | BOOLEAN | NOT NULL, default TRUE | Can be disabled |
+| `created_at` | TIMESTAMP | NOT NULL | |
+
+**Seed Data**
+| hint_key | display_name | where_shown | description |
+|----------|--------------|-------------|-------------|
+| `first_problem_welcome` | Welcome to Problems | Problem creation | Welcome panel for first problem |
+| `first_pitch_voting` | Pitch Voting Guide | Pitch assessment | Explanation of pitch voting |
+| `first_team_join` | Team Join Guide | Problem Card | Guidance after joining team |
+| `dual_state_explanation` | Dual State Model | Problem Card | Readiness vs Action state explanation |
+| `assessment_skip_ok` | Skip Dimensions OK | Assessment form | "It's OK to skip dimensions" |
+| `dashboard_overview` | Dashboard Overview | Dashboard | First-time dashboard orientation |
+| `moderator_dashboard_intro` | Moderator Dashboard | Moderator dashboard | First-time moderator orientation |
+
+---
+
+### 19.3.41 `user_hint_dismissals`
 
 Tracks **dismissed onboarding hints** so users don't see the same guidance repeatedly (Chapter 32).
 
@@ -1420,13 +1599,13 @@ Tracks **dismissed onboarding hints** so users don't see the same guidance repea
 | Column | Type | Constraints | Notes |
 |--------|------|-------------|-------|
 | `user_id` | UUID | FK → users, NOT NULL | |
-| `hint_key` | VARCHAR(50) | NOT NULL | Hint identifier |
+| `hint_key` | VARCHAR(50) | FK → hint_key_catalog, NOT NULL | Hint identifier |
 | `dismissed_at` | TIMESTAMP | NOT NULL | |
 
 **Constraints**
 - PK (`user_id`, `hint_key`)
 
-**Standard Hints**
+**Standard Hints** (see §19.3.40 for full catalog)
 | hint_key | Where Shown | Description |
 |----------|-------------|-------------|
 | `first_problem_welcome` | Problem creation | Welcome panel for first problem |
@@ -1451,7 +1630,7 @@ VALUES (?, 'first_problem_welcome', NOW());
 
 ---
 
-### 19.3.39 `api_keys`
+### 19.3.42 `api_keys`
 
 Manages **API keys** that authenticate bot users against the platform's REST API. Keys are created and revoked exclusively by human users; bots cannot create or manage keys.
 
@@ -1600,7 +1779,7 @@ This separation ensures that transient operational states (pitch open, review op
 - **Chapter 11**: Event model → `events`, `event_problem_queue`, `event_live_context`
 - **Chapter 13**: Problem Card UI → `problem_resources`, `problem_teams`, `problem_team_members`
 - **Chapter 14**: Live interaction modes → `event_live_context` (including timer fields for pace support)
-- **Chapter 16**: E-mail communication → trigger inventory, delivery constraints
+- **Chapter 16**: E-mail communication → `event_email_templates` (versioned templates), `communications_log` (audit trail), trigger inventory, delivery constraints; ADR 010 (OS-Cron architecture)
 - **Chapter 31**: Team chat
 - **Chapter 18**: Authentication → `users` (auth fields), `auth_provider_catalog`, `users.show_on_contributor_wall`, `api_keys` (bot authentication)
 - **Chapter 20**: Traceability → `decisions` as activity log

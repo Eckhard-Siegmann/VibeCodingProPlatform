@@ -299,6 +299,50 @@ Cross-Location Insights (from Aachen):
 • "Greenfield problems under 3 tasks get higher completion rates"
 ```
 
+#### Event-Level Review Results
+
+When at least one review assessment has been closed for an event, the moderator dashboard displays a **Review Results Summary** card. This provides a ranked overview of all reviewed problems.
+
+**Data per problem:**
+
+| Field | Source |
+|-------|--------|
+| Problem title | `problem_versions.title` (via assessment → problem linkage) |
+| Response count (N) | COUNT(DISTINCT user_id) from non-superseded review responses |
+| Per-item weighted mean | AVG(rating_value × weight_multiplier) grouped by item, from `responses` joined with `review_weight_catalog` |
+| Overall weighted average | Mean of per-item weighted means (excludes `engagement_intensity` and `cognitive_ease` meta-items from overall score) |
+| Rank | Ordinal position by overall weighted average (descending) |
+
+**Sorting**: Default sort is by rank (highest overall weighted average first).
+
+**Visibility**: The review results summary is visible only to users with `moderator` or `admin` role. Participants see per-problem results on the Problem Card but not the cross-problem ranking until star awards are confirmed.
+
+**Relationship to star awards**: The review results summary informs the moderator's decision to award stars (Chapter 33.6.4) but does not automatically trigger awards. The moderator retains adjustment authority for extraordinary circumstances.
+
+#### Event-Level Pitch Results
+
+When at least one pitch assessment has been closed for an event, the moderator dashboard displays a **Pitch Results Summary** card. This provides an overview of all pitched problems, supporting the group discussion that follows each pitch round.
+
+**Data per problem:**
+
+| Field | Source |
+|-------|--------|
+| Problem title | `problem_versions.title` (via assessment → problem linkage) |
+| Response count (N) | COUNT(DISTINCT user_id) from non-superseded pitch responses |
+| Per-item mean | AVG(rating_value) grouped by item (simple average, no weighting) |
+| Overall average | Mean of per-item means |
+
+**Key differences from review results:**
+- **No weighting**: Pitch assessments use simple averages (review_weight_catalog does not apply).
+- **No ranking**: Per Ch.15.1, pitch results display descriptive statistics only — no automatic winner indicators, no ordinal ranking. The purpose is to inform discussion, not to determine outcomes.
+- **No meta-item exclusion**: All items in the pitch inventory contribute to the overall average (engagement_intensity and cognitive_ease are review-only items).
+
+**Sorting**: Default sort is by pitch order (position in event queue), preserving the live event sequence.
+
+**Visibility**: The pitch results summary is visible only to users with `moderator` or `admin` role. Participants see per-problem results on the Problem Card after assessment closure.
+
+**Chart integration**: Each problem row includes a compact inline bar visualization of per-item means, aiding quick visual comparison. An optional bar chart view can display all problems' overall averages side-by-side.
+
 ---
 
 ## 15.5 Chart Components and Visualizations

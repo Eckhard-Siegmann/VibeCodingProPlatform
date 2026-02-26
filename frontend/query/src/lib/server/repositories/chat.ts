@@ -297,6 +297,7 @@ export function getAvailableEmojis(): EmojiOption[] {
 
 /**
  * Post a new chat message.
+ * Parses @mentions from content and inserts into chat_mentions (Ch.31.4).
  */
 export function postChatMessage(data: {
 	userId: string;
@@ -350,6 +351,11 @@ export function postChatMessage(data: {
 		data.userRole,
 		now
 	);
+
+	// Parse @mentions and insert into chat_mentions (Ch.31.4)
+	if (!data.isBot) {
+		parseMentions(messageId, data.content, now);
+	}
 
 	return { success: true, message_id: messageId };
 }
@@ -594,4 +600,42 @@ function convertRowToMessage(row: ChatMessageRow): ChatMessage {
 		is_bot: Boolean(row.is_bot),
 		visible: Boolean(row.visible)
 	};
+}
+
+/**
+ * Parse @mentions from message content and insert into chat_mentions.
+ * Matches @DisplayName patterns (spaces removed per ChatInput component).
+ * Per Ch.31.4: "System creates entry in chat_mentions."
+ */
+function parseMentions(messageId: string, content: string, createdAt: string): void {
+	const db = getDatabase();
+	const mentionPattern = /@(\S+)/g;
+	let match: RegExpExecArray | null;
+	const mentionedUserIds = new Set<string>();
+
+	while ((match = mentionPattern.exec(content)) !== null) {
+		const mentionText = match[1]; // e.g. "MaxMustermann"
+
+		// Look up user by display_name with spaces removed (matching ChatInput insertion)
+		const users = db
+			.prepare(
+				`SELECT user_id FROM users WHERE REPLACE(display_name, ' ', '') = ? COLLATE NOCASE`
+			)
+			.all(mentionText) as { user_id: string }[];
+
+		for (const user of users) {
+			if (!mentionedUserIds.has(user.user_id)) {
+				mentionedUserIds.add(user.user_id);
+				const mentionId = generateId();
+				try {
+					db.prepare(
+						`INSERT INTO chat_mentions (mention_id, message_id, mentioned_user_id, created_at)
+						 VALUES (?, ?, ?, ?)`
+					).run(mentionId, messageId, user.user_id, createdAt);
+				} catch {
+					// UNIQUE constraint — already mentioned in this message, skip
+				}
+			}
+		}
+	}
 }

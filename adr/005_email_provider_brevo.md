@@ -28,21 +28,92 @@ We have decided to use **Brevo (formerly Sendinblue)** natively via their REST A
 - **Negative/Risk:** Vendor lock-in. Switching to SendGrid, Mailgun, or Postmark would require recreating all the visual templates out of Brevo and mapping new API request structures in the Node.js/Typescript codebase. 
 - **Development Implication:** Local development must be routed to a sterile/sandbox API key or a console-logger dummy class to prevent real emails being sent out while modifying local state.
 
-## Abstract Data Payload Implementation Schema
-The backend must send requests in this approximate shape without injecting HTML text:
+## Implementation Details
+
+### Two Dispatch Patterns
+
+The platform uses two distinct email dispatch patterns, both routed through the Brevo REST API (`POST https://api.brevo.com/v3/smtp/email`):
+
+#### Pattern 1: Transactional Emails (Brevo-Managed Templates)
+
+For authentication and onboarding flows, the backend sends only a `templateId` and `params`. The email's visual layout, subject line, and body text are managed entirely within the Brevo Dashboard.
+
 ```json
 {
   "to": [{ "email": "target@domain.test", "name": "Dynamic Name" }],
   "templateId": 4,
   "params": {
-    "event_name": "VibeCoding Aachen March 2026",
-    "rsvp_url": "https://example.com/rsvp/token"
+    "otp_code": "A8kz9mXp2qLw",
+    "platform_url": "https://vibecoding.events"
   }
 }
 ```
+
+**Required Brevo templates** (IDs configured via `BREVO_TEMPLATE_*` env vars):
+
+| Env Variable | Purpose | Required `params` |
+|-------------|---------|-------------------|
+| `BREVO_TEMPLATE_EMAIL_CONFIRMATION` | Self-registration confirmation link | `confirmation_url`, `display_name` |
+| `BREVO_TEMPLATE_PASSWORD_RESET` | Forgot-password OTP delivery | `otp_code`, `display_name` |
+| `BREVO_TEMPLATE_ONBOARDING_OTP` | CSV-import initial password setup | `otp_code`, `set_password_url`, `display_name` |
+
+#### Pattern 2: Event Emails (Platform-Managed Content)
+
+For event communications (broadcasts, waitlist invites, reminders), the content is authored by moderators in the platform's versioned `event_email_templates` table (Ch.16.6). The backend passes the moderator-authored subject and body as `params` to a single **generic wrapper template** in Brevo. This wrapper provides the standard visual layout (header, footer, unsubscribe link) while the content comes from the platform.
+
+```json
+{
+  "to": [{ "email": "target@domain.test", "name": "Dynamic Name" }],
+  "templateId": 10,
+  "params": {
+    "subject_line": "Reminder: VibeCoding Cologne starts soon!",
+    "body_content": "Hi Max, ...",
+    "display_name": "Max Mustermann"
+  }
+}
+```
+
+| Env Variable | Purpose | Required `params` |
+|-------------|---------|-------------------|
+| `BREVO_TEMPLATE_EVENT_GENERIC` | Wrapper for moderator-authored event emails | `subject_line`, `body_content`, `display_name` |
+
+This preserves the ADR's core principle: no HTML assembly in backend code. The Brevo wrapper template handles all visual rendering.
+
+### API Configuration
+
+| Env Variable | Purpose | Default |
+|-------------|---------|---------|
+| `BREVO_API_KEY` | Brevo REST API key (v3) | *none* — dev mode logs to console |
+| `BREVO_SENDER_EMAIL` | From address for all emails | `noreply@vibecoding.events` |
+| `BREVO_SENDER_NAME` | Display name for sender | `VibeCoding Community` |
+| `BREVO_TEMPLATE_EMAIL_CONFIRMATION` | Template ID for email confirmation | — |
+| `BREVO_TEMPLATE_PASSWORD_RESET` | Template ID for password reset OTP | — |
+| `BREVO_TEMPLATE_ONBOARDING_OTP` | Template ID for CSV-import onboarding | — |
+| `BREVO_TEMPLATE_EVENT_GENERIC` | Template ID for event wrapper | — |
+| `ORIGIN` | Platform base URL for building links | `http://localhost:5173` |
+
+### Dev Mode Behavior
+
+When `BREVO_API_KEY` is not set (local development), all email dispatch functions log to the server console with `[EMAIL-DEV]` prefix and return success. The `communications_log` audit trail is always written regardless of dispatch mode.
+
+### Idempotency (Ch. 16.1.5)
+
+Each email dispatch includes an `X-Mailin-custom` header containing a deterministic idempotency key derived from the trigger context:
+
+| Trigger | Key Pattern |
+|---------|-------------|
+| Email confirmation | `confirm:{user_id}:{hash_prefix}` |
+| Password reset | `reset:{user_id}:{timestamp_minute}` |
+| Onboarding OTP | `onboard:{user_id}` |
+| Event broadcast | `broadcast:{event_id}:{template_version}:{user_id}` |
+| Waitlist invite | `waitlist:{event_id}:{registration_id}` |
+| Event reminder | `reminder:{event_id}:{user_id}` |
+
+Note: Brevo does not natively deduplicate on custom headers. The idempotency key is passed as a `params` field (`_idempotency_key`) for potential future webhook reconciliation. The primary deduplication responsibility remains with the platform's trigger logic (e.g., checking `waitlist_invited_at` before re-inviting).
 
 ## References
 
 - Platform Spec Chapter 16: E-Mail Communication (trigger inventory, delivery constraints, idempotency)
 - Platform Spec Chapter 18: Authentication — OTP, password reset, email confirmation flows
 - Platform Spec Chapter 30: Registration and Onboarding — welcome email, waitlist notification
+- Brevo API Reference: https://developers.brevo.com/reference/sendtransacemail

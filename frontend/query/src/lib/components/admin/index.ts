@@ -15,3 +15,12 @@ export type { CSVRow, ImportResult, EventOption } from './CSVImportWizard.svelte
 
 export { default as PartnerEditor } from './PartnerEditor.svelte';
 export type { EditorMode, PartnerData, LocationData, RoomData } from './PartnerEditor.svelte';
+
+export { default as CatalogEditor } from './CatalogEditor.svelte';
+export type {
+	SoftCatalogEntry,
+	EmojiEntry,
+	ContributionActionEntry,
+	ReviewWeightEntry,
+	CatalogTab
+} from './CatalogEditor.svelte';

@@ -70,28 +70,40 @@ For local (email + password) authentication, passwords must meet these criteria:
 
 ## 18.3 One-Time Password (OTP) Flow
 
-### Initial Onboarding
+### Purpose
 
-When a new user is created (via registration or CSV import), they receive an email containing a **one-time password**:
+OTPs are used exclusively for **password initialization** when the user did not set a password themselves. This applies to CSV-imported users and password reset flows — **not** to self-registration (where the user sets their password directly).
 
-1. Admin or system creates user with email address
+### CSV Import Onboarding
+
+When a new user is created via CSV import or admin action:
+
+1. Admin creates user with email address
 2. System sets `email_confirmed = TRUE` and `login_enabled = FALSE`
-3. System generates random OTP and stores hash in `password_hash` field
-4. System sends onboarding email with OTP
-5. User visits password change page with email + OTP
-6. User sets new password meeting policy requirements
-7. System sets `login_enabled = TRUE` and invalidates OTP
-8. User can now login with email + new password
+3. System generates random OTP and stores hash in `otp_hash` field
+4. System sets `otp_is_initial = TRUE`
+5. System sends onboarding email with OTP
+6. User visits password-set page with email + OTP
+7. User sets new password meeting policy requirements
+8. System sets `login_enabled = TRUE`, clears `otp_hash` and `otp_is_initial`
+9. User can now login with email + new password
 
-**Critical**: The OTP is **not for logging in**. It is solely for setting the initial password. Users cannot access the platform until they complete this password change step.
+**Critical**: The OTP is **not for logging in**. It is solely for setting the initial password. CSV-imported users cannot access the platform until they complete this password-set step.
 
-### Account States During Onboarding
+### Account States — Complete Matrix
 
-| State | `email_confirmed` | `login_enabled` | Can Login? | Can Set Password? |
-|-------|-------------------|-----------------|------------|-------------------|
-| CSV imported | TRUE | FALSE | ❌ No | ✅ Yes (via OTP) |
-| Email not confirmed | FALSE | FALSE | ❌ No | ❌ No |
-| Password set | TRUE | TRUE | ✅ Yes | ✅ Yes (via old password) |
+The following matrix covers **all registration pathways** and reconciles with §18.5 (email confirmation):
+
+| State | Registration Path | `email_confirmed` | `login_enabled` | Can Login? | Can Set Password? | Receives Newsletters? |
+|-------|-------------------|-------------------|-----------------|------------|-------------------|-----------------------|
+| Self-registered, unconfirmed | Email + Password | FALSE | TRUE | ✅ Yes | ✅ Yes (via old password) | ❌ No |
+| Self-registered, confirmed | Email + Password | TRUE | TRUE | ✅ Yes | ✅ Yes (via old password) | ✅ Yes |
+| CSV imported, OTP pending | CSV Import | TRUE | FALSE | ❌ No | ✅ Yes (via OTP) | ✅ Yes |
+| CSV imported, password set | CSV Import | TRUE | TRUE | ✅ Yes | ✅ Yes (via old password) | ✅ Yes |
+| OAuth registered | GitHub / LinkedIn | TRUE | TRUE | ✅ Yes (via OAuth) | ❌ No (no local password) | ✅ Yes |
+| Password reset pending | Any (local auth) | (unchanged) | TRUE | ❌ No (old password invalidated) | ✅ Yes (via OTP) | (unchanged) |
+
+**Key distinction**: Self-registered users set their password at registration, so `login_enabled = TRUE` immediately. They can log in with an unconfirmed email (per §18.5) but cannot receive informational emails until confirmed.
 
 ### OTP Characteristics
 
@@ -108,13 +120,16 @@ When a new user is created (via registration or CSV import), they receive an ema
 Users who forget their password can request a reset:
 
 1. User clicks "Forgot Password" and enters email
-2. System generates new OTP and stores hash (invalidating any previous OTP)
-3. System sends email with new OTP
-4. User logs in with email + new OTP
-5. System requires password change
-6. User sets new password
+2. System generates new OTP and stores hash (invalidating any previous password hash)
+3. System sets `otp_is_initial = TRUE`
+4. System sends email with OTP
+5. User visits password-set page with email + OTP
+6. System verifies OTP hash matches
+7. User sets new password meeting policy requirements
+8. System stores new password hash, clears `otp_hash` and `otp_is_initial`
+9. User can now login with email + new password
 
-**Security Note**: The forgot password flow rate-limits requests to prevent abuse.
+**Security Note**: The forgot password flow rate-limits OTP generation requests to prevent abuse (see ADR 004).
 
 ---
 
@@ -267,7 +282,7 @@ Role changes are **explicit and auditable**:
 - An Administrator can promote any user to Moderator
 - An Administrator can promote a Moderator to Administrator
 - There is no self-escalation
-- Role changes are logged in the decisions table
+- Role changes are applied directly to the `users.role` field; the `decisions` table (Chapter 19 §19.3.20) is **not used** for role changes because it is scoped to problem-lifecycle decisions and requires a `problem_id`. A dedicated admin audit log is a future direction (see Chapter 22).
 
 ---
 
@@ -297,6 +312,40 @@ Agents cannot:
 - Moderate events
 - Manage users or system configuration
 - Register for events
+
+### 18.8.1 API Key Format
+
+API keys issued by the platform follow a fixed format:
+
+| Property | Specification |
+|----------|---------------|
+| Format | `mk_` prefix + 40 lowercase hex characters = 43 chars total |
+| Generation | `crypto.randomBytes(20)` converted to hex, prepended with `mk_` |
+| Display prefix | First 8 characters of the key (e.g., `mk_abc12d`) — stored in `api_keys.display_prefix` |
+| Storage | SHA-256 hash only — plaintext is **never stored** server-side |
+| One-time display | Plaintext shown exactly once immediately after creation; the user must copy it |
+
+### 18.8.2 Bearer Token Validation Flow
+
+When an HTTP request carries `Authorization: Bearer <token>`:
+
+1. Extract raw token from header
+2. Compute SHA-256 hash of raw token
+3. Query `api_keys` WHERE `key_hash = ?` AND `valid_from ≤ NOW()` AND (`valid_until IS NULL` OR `valid_until > NOW()`) AND `revoked_at IS NULL`
+4. If no matching row → `401 Unauthorized`
+5. Look up bot user: `users` WHERE `api_key_id = <resolved api_key_id>`
+6. If no bot user found → `401 Unauthorized` (data integrity violation)
+7. Use bot user's `user_id` for all attribution and authorization checks
+
+### 18.8.3 Bot User Lifecycle
+
+Each API key has exactly one associated bot user (`users.api_key_id = api_keys.api_key_id`):
+
+- Bot user is auto-created atomically when the API key is created
+- `display_name = 'Bot of {owner.display_name}'`
+- `role = 'agent'`, `email = NULL`, `login_enabled = FALSE`
+- Bot user persists after key revocation (for historical attribution of past actions)
+- A human can own multiple API keys, each with its own bot user identity
 
 ---
 
@@ -503,9 +552,13 @@ Every API endpoint MUST enforce authorization before processing requests. This s
 
 | Level | Applies To | Requirement |
 |-------|-----------|-------------|
-| **Authenticated** | All endpoints | Valid user identity (session cookie). Failure → `401 Unauthorized` |
+| **Authenticated** | All human-facing endpoints | Valid user identity (session cookie). Failure → `401 Unauthorized` |
+| **API key authenticated** | Agent-accessible endpoints | Valid API key via `Authorization: Bearer <token>` header. Resolved via §18.8.2 validation flow. Failure → `401 Unauthorized`. Returns bot user identity. |
 | **Role-gated** | Mutating endpoints (POST, PATCH, DELETE) on queue, decisions, live context | User must hold `moderator` or `admin` role. Failure → `403 Forbidden` |
 | **Objectivity-constrained** | Binding decisions (decisions endpoint) | Moderator must NOT be a team member (coder) on the target problem. Checked via `getEffectiveRole()` (see Ch.3). Failure → `403 Forbidden: objectivity constraint` |
+| **Review COI-constrained** | Review assessment responses (responses endpoint) | User must NOT be PO or active team member on the assessed problem. Checked via `problems.created_by` and `problem_team_members`. Failure → `403 Forbidden: conflict of interest` |
+
+**Note on Bearer token scope**: Bearer token authentication is intended exclusively for agent users (role = agent). Existing human-facing UI endpoints do not require Bearer support. Specific endpoints accessible to agents will be enumerated when agent stories G1–G4 are implemented (see Ch.23.6). The infrastructure for Bearer token validation is established by TICKET-21.
 
 ### 18.14.2 Endpoint Authorization Matrix
 
@@ -515,7 +568,7 @@ Every API endpoint MUST enforce authorization before processing requests. This s
 | `/api/events/[eventId]/queue/[problemId]` | — | — | — | Moderator |
 | `/api/events/[eventId]/decisions` | — | Moderator + Objectivity | — | — |
 | `/api/events/[eventId]/live-context` | Authenticated | — | — | — |
-| `/api/assess/[assessmentId]/responses` | Authenticated | Authenticated | — | — |
+| `/api/assess/[assessmentId]/responses` | Authenticated | Authenticated + Review COI | — | — |
 
 ### 18.14.3 HTTP Error Response Contract
 
@@ -542,3 +595,19 @@ Before recording a **binding** decision (`is_binding = true`), the decisions end
 4. If effective role is `coder` (team member on the target problem), reject with `403 Forbidden: objectivity constraint — moderator is a team member on this problem`
 
 This enforces the principle from Ch.12.5: moderators who are coding on a problem lose binding decision authority for that specific problem. They may still make non-binding recommendations (agents and conflicted moderators use `is_binding = false`).
+
+### 18.14.5 Review Assessment COI Constraint at API Level
+
+Before accepting a **review assessment response** (POST to `/api/assess/[assessmentId]/responses`), the endpoint MUST:
+
+1. Authenticate the user (→ 401 if missing)
+2. Load the assessment and determine its inventory_key
+3. If `inventory_key = 'review_assessment'`:
+   a. Look up the assessment's `problem_id`
+   b. Check if the user is the Problem Owner (`problems.created_by = user_id`)
+   c. Check if the user is an active team member via `problem_team_members` (any role: `po`, `po_deputy`, or `coder`)
+   d. If either check is true, reject with `403 Forbidden: conflict of interest — cannot review your own problem`
+
+This enforces the principle from Ch.14.2: Problem Owners and their team members cannot objectively evaluate solutions they produced. The constraint applies only to review assessments, not pitch or self-assessments.
+
+**Note**: This is a **participation constraint** (who can submit responses), distinct from the **objectivity constraint** in §18.14.4 (who can make binding decisions).

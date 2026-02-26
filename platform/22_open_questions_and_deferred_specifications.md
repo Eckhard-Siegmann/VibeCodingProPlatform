@@ -150,13 +150,26 @@ Its purpose is to ensure that future evolution remains intentional, transparent,
 
 **Original question**: When a problem is dropped or rejected, should its queue entry be automatically removed?
 
-**Resolution**: Ejection decisions (`deselected_for_event`, `quality_gate_rejected`, `dropped_low_relevance`, `dropped_low_quality`) remove from queue and re-compact indices. Closing decisions transition queue state to `completed`. Deferral decisions leave queue entries untouched. See **Chapter 19, §19.3.19** for the ejection cleanup invariant.
+**Resolution**: Ejection decisions (`deselected_for_event`, `quality_gate_rejected`, `dropped_low_relevance`, `dropped_low_quality`) remove from queue and re-compact indices. Closing decisions transition queue state to `completed`. Deferral decisions leave queue entries untouched. See **Chapter 19, §19.3.21** for the ejection cleanup invariant.
 
 ### Decision Type Vocabulary Consistency *(RESOLVED)*
 
 **Original question**: How to prevent drift between the database `decision_type_catalog` and frontend UI code?
 
 **Resolution**: A centralized TypeScript constants module (`src/lib/constants/decisions.ts`) mirrors all 25 catalog entries. All UI components and repository functions import from this module — no inline string literals. See **Chapter 19, §19.2.3** implementation requirement note.
+
+### `selected_for_pitch` Queue State Trigger *(OPEN)*
+
+**Question**: The `queue_state_catalog` defines `selected_for_pitch` as a valid queue state in `event_problem_queue` (Ch.29.8), but no decision type currently transitions a queue entry to this state. The `opened_for_pitch_assessment` decision only affects `event_live_context` (mode, timer, current_problem_id), not the queue state.
+
+**Options**:
+1. Set `selected_for_pitch` as a side-effect of `opened_for_pitch_assessment` in `recordDecision()` step 9
+2. Keep it as a future enhancement for explicit pitch planning (separate from live pitch opening)
+3. Remove it from the catalog as unused
+
+**Impact**: Non-blocking. Current queue management works correctly with `candidate` → `selected_for_coding` → `completed` transitions. The `selected_for_pitch` state is informational and does not affect any existing workflows.
+
+**Deferred until**: Empirical usage reveals whether moderators need per-problem pitch planning distinct from live pitch opening.
 
 ### Review Decision Type Naming *(RESOLVED)*
 

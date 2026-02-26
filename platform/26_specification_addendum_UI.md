@@ -856,6 +856,7 @@ export function getAvatarColor(userId: string): string
 ### 26.11.17 Navigation Components
 
 **Added 2026-02-05**: Back button for hierarchical navigation (Decision #9).
+**Updated 2026-02-25**: BackButton is one part of the navigation system. For the global app chrome (TopAppBar, BottomNavBar), see §26.16.
 
 **BackButton.svelte**:
 - Props: `label` (optional, defaults to "Back"), `href` (optional), `onclick` (optional)
@@ -1368,4 +1369,476 @@ Full threading support on mobile per Decision #18 (full-featured chat).
 
 ---
 
-*This addendum captures UI design decisions. Section 26.1-26.10 established 2026-01-29. Section 26.11 added 2026-02-04 documenting the shadcn-svelte component system. Sections 26.11.10-26.11.22, 26.12, and 26.15 added 2026-02-05 for mobile admin support and chat UI.*
+---
+
+## 26.16 Global App Chrome: Split Navigation
+
+**Added 2026-02-25**: Detailed component specifications for the "App-Like" Split Navigation pattern defined in Chapter 12.7. This section provides implementation-ready requirements for the Top App Bar and Bottom Navigation Bar.
+
+### 26.16.1 TopAppBar Component
+
+**Component**: `layout/TopAppBar.svelte`
+
+**Props Interface**:
+```typescript
+interface Props {
+  user: {
+    display_name: string;
+    user_id: string;
+  } | null;
+  class?: string;
+}
+```
+
+**Visual Specification**:
+
+```
+┌──────────────────────────────────────────────┐
+│  VibeCoding                        [EH]  ▼  │
+│  ← Brand (left)              Avatar (right) →│
+└──────────────────────────────────────────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Position | `fixed` (or `sticky`), `top: 0` |
+| Z-index | `z-50` (above Live Banner at z-40) |
+| Height | 44px (mobile), 48px (desktop) |
+| Background | `bg-card` (`#FEFEFE`) |
+| Border bottom | `1px solid --color-secondary` (subtle separator) |
+| Shadow | `--shadow-resting` (`0px 1px 3px rgba(0,0,0,0.05)`) |
+| Padding | `px-4` (mobile), `px-6` (desktop) |
+| Layout | `flex items-center justify-between` |
+
+**Left Region (Brand)**:
+- Platform name: "VibeCoding" in `text-headers` (`#192A4B`), `font-semibold`, `text-lg`
+- Logo icon (optional, future): 24×24px to left of text
+- Mobile: Name only ("VibeCoding")
+- Desktop: Name + optional tagline ("VibeCoding Professionals") in `text-labels`, `text-sm`
+
+**Right Region (User Identity)**:
+- **InitialAvatar** component (Ch.26.11.16) at `size="sm"` (24px mobile, 32px desktop)
+- Tap/click opens **AccountMenu** (see below)
+- Cursor: `pointer`
+- Focus: `outline-2 outline-offset-2 outline-primary` ring
+
+**AccountMenu (Dropdown / Bottom Sheet)**:
+
+On **desktop (≥768px)**: Dropdown menu (bits-ui DropdownMenu), aligned right:
+```
+┌──────────────────┐
+│  Eva Schmidt     │  ← Display name (non-interactive)
+│  eva@example.com │  ← Email (non-interactive, text-labels)
+├──────────────────┤
+│  ⚙  Settings     │  ← Route: /settings (future)
+│  👤 Profile       │  ← Route: /profile (future)
+├──────────────────┤
+│  🚪 Logout       │  ← Action: POST /api/auth/logout
+└──────────────────┘
+```
+
+On **mobile (<768px)**: Bottom sheet (bits-ui Dialog, bottom-positioned):
+- Same items as dropdown, larger touch targets (48px per item)
+- Backdrop: Semi-transparent, dismisses on tap
+- Swipe-down to dismiss
+
+**Menu Item Specification**:
+| Property | Value |
+|----------|-------|
+| Height | 40px (desktop), 48px (mobile) |
+| Padding | `px-4 py-2` |
+| Icon size | 16px (desktop), 20px (mobile) |
+| Hover | `bg-canvas` |
+| Destructive (Logout) | `text-alert` on hover |
+| Divider | 1px `border-secondary` between groups |
+
+**ARIA Requirements**:
+- Avatar button: `role="button"`, `aria-haspopup="menu"`, `aria-expanded`
+- Menu: `role="menu"`, items have `role="menuitem"`
+- Focus trap when open, Escape to close
+- Arrow keys to navigate menu items
+
+### 26.16.2 BottomNavBar Component
+
+**Component**: `layout/BottomNavBar.svelte`
+
+**Props Interface**:
+```typescript
+interface NavItem {
+  icon: Component;      // Lucide icon
+  label: string;        // Short label (max 10 chars)
+  href: string;         // Route path
+  badge?: number;       // Optional notification count
+  visibleTo?: string[]; // Role restriction (empty = all authenticated)
+}
+
+interface Props {
+  items: NavItem[];
+  currentPath: string;  // Active route for highlighting
+  class?: string;
+}
+```
+
+**Visual Specification**:
+
+```
+┌────────┬────────┬────────┬────────┐
+│  🏠    │  📅   │  📋    │  🎛️   │
+│ Home   │Events  │Problems│Moderate│
+│ (active)│       │        │        │
+└────────┴────────┴────────┴────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Position | `fixed`, `bottom: 0`, `left: 0`, `right: 0` |
+| Z-index | `z-50` (same level as TopAppBar) |
+| Height | 56px (mobile), 60px (desktop) |
+| Background | `bg-card` (`#FEFEFE`) |
+| Border top | `1px solid --color-secondary` |
+| Shadow | `0px -1px 3px rgba(0,0,0,0.05)` (upward shadow) |
+| Layout | `flex items-center justify-around` |
+| Safe area | `pb-[env(safe-area-inset-bottom)]` (iOS notch) |
+
+**Nav Item States**:
+
+| State | Icon Color | Label Color | Indicator |
+|-------|-----------|-------------|-----------|
+| **Inactive** | `text-labels` (`#7B7C90`) | `text-labels` | None |
+| **Active** | `text-primary` (`#2680F1`) | `text-primary` | Filled icon variant + 3px top bar |
+| **Hover** (desktop) | `text-headers` | `text-headers` | Subtle `bg-canvas` |
+
+**Active Indicator**: A 3px-tall, rounded bar in `bg-primary` appears above the active icon:
+```
+     ━━━━━        ← Active indicator (3px, rounded, primary color)
+      🏠
+     Home
+```
+
+**Item Layout** (each item):
+```
+flex flex-col items-center justify-center gap-0.5
+```
+- Icon: 24px (Lucide), `stroke-width: 1.5` (inactive), `stroke-width: 2` (active)
+- Label: `text-xs` (10px), `font-medium`
+- Touch target: Entire item area, minimum 48×48px
+- No padding between icon and text (tight vertical stack)
+
+**Badge (Notification Dot)**:
+- Position: Top-right of icon, overlapping
+- Size: `w-4 h-4` (16px circle) if count, `w-2 h-2` (8px dot) if boolean
+- Color: `bg-alert` (`#D95A5C`), `text-white`, `text-[10px]`
+- Count: Display number if ≤99, "99+" otherwise
+
+**Role-Based Visibility**:
+- Items with `visibleTo` restrictions are only rendered for matching roles
+- The bar dynamically adjusts item spacing (`justify-around`) based on visible count
+- Minimum 3 items, maximum 5 items visible simultaneously
+- Role is determined server-side and passed via page data
+
+**Default Item Configuration**:
+
+```typescript
+const defaultNavItems: NavItem[] = [
+  { icon: Home, label: 'Home', href: '/dashboard' },
+  { icon: Calendar, label: 'Events', href: '/events' },
+  { icon: ClipboardList, label: 'Problems', href: '/problems' },
+];
+
+const moderatorNavItems: NavItem[] = [
+  ...defaultNavItems,
+  { icon: Sliders, label: 'Moderate', href: '/dashboard/moderator', visibleTo: ['moderator', 'admin'] },
+];
+
+const adminNavItems: NavItem[] = [
+  ...moderatorNavItems,
+  { icon: Settings, label: 'Admin', href: '/admin', visibleTo: ['admin'] },
+];
+```
+
+**ARIA Requirements**:
+- Container: `<nav role="navigation" aria-label="Main navigation">`
+- Each item: `<a>` element with `aria-current="page"` on active item
+- Focus visible: 2px outline ring on focus
+- Keyboard: Tab navigates between items, Enter activates
+
+### 26.16.3 Layout Integration with LiveBanner
+
+The three sticky/fixed elements must layer correctly:
+
+**Vertical Z-Index Stack**:
+
+| Layer | Component | Z-Index | Position |
+|-------|-----------|---------|----------|
+| 3 (top) | TopAppBar | `z-50` | `fixed top-0` |
+| 2 | LiveBanner | `z-40` | `sticky top-[44px]` (mobile) / `top-[48px]` (desktop) |
+| 1 | Page content | default | Normal flow |
+| 3 (bottom) | BottomNavBar | `z-50` | `fixed bottom-0` |
+
+**Content Padding**:
+The main page content area must account for both fixed elements:
+- `padding-top`: Height of TopAppBar (44px mobile / 48px desktop)
+- `padding-bottom`: Height of BottomNavBar (56px mobile / 60px desktop) + safe area inset
+
+**PageContainer Update**:
+The existing `PageContainer.svelte` (Ch.6.2 in template collection) must be updated to include these offsets:
+
+```svelte
+<main class="pt-[44px] pb-[56px] md:pt-[48px] md:pb-[60px]">
+  <!-- Existing canvas wrapper -->
+</main>
+```
+
+### 26.16.4 Scroll Behavior
+
+**Bottom Nav Bar auto-hide** (optional enhancement, not MVP):
+- On scroll down: BottomNavBar slides out of view (translateY 100%)
+- On scroll up: BottomNavBar slides back in
+- Transition: 200ms ease-out
+- This is a **future enhancement** — MVP keeps the bar always visible
+
+**Top App Bar**: Always visible (never auto-hides). Provides constant brand and identity anchor.
+
+### 26.16.5 Design Tokens (Navigation)
+
+New CSS custom properties added to `app.css` `@theme` block:
+
+```css
+@theme {
+  /* Navigation chrome */
+  --height-topbar-mobile: 44px;
+  --height-topbar-desktop: 48px;
+  --height-bottomnav-mobile: 56px;
+  --height-bottomnav-desktop: 60px;
+  --color-nav-active: var(--color-primary);      /* #2680F1 */
+  --color-nav-inactive: var(--color-labels);      /* #7B7C90 */
+  --shadow-nav: 0px 1px 3px rgba(0, 0, 0, 0.05);
+}
+```
+
+### 26.16.6 Files
+
+| Component | Path |
+|-----------|------|
+| TopAppBar | `layout/TopAppBar.svelte` |
+| AccountMenu | `layout/AccountMenu.svelte` (or inline in TopAppBar) |
+| BottomNavBar | `layout/BottomNavBar.svelte` |
+
+These components are placed in the `layout/` directory alongside the existing `PageContainer.svelte` and `Header.svelte`.
+
+---
+
+## 26.17 Scalable List View Components
+
+**Added 2026-02-25**: Implementation-ready component specifications for the pagination, search, and filtering pattern defined in Chapter 12.10. These components provide consistent UX across all list views (Problem Backlog, Events Listing, Admin pages).
+
+### 26.17.1 Pagination Component
+
+**Component**: `ui/Pagination.svelte`
+
+**Props Interface**:
+```typescript
+interface Props {
+  page: number;          // Current page (1-indexed)
+  totalPages: number;    // Total number of pages
+  totalItems?: number;   // Total item count (for "Showing X of Y" label)
+  pageSize?: number;     // Items per page (for label)
+  onPageChange: (page: number) => void;  // Callback when page changes
+  class?: string;
+}
+```
+
+**Visual Specification (Desktop ≥768px)**:
+
+```
+┌───────────────────────────────────────────────────────┐
+│ Showing 21-40 of 247    [◀ Prev] 1 2 [3] 4 5 … 13 [Next ▶] │
+└───────────────────────────────────────────────────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Layout | `flex items-center justify-between` |
+| Height | 40px |
+| Gap | `gap-1` between page buttons |
+| Info label | `text-labels`, `text-sm` — "Showing {start}-{end} of {total}" |
+
+**Page Button States**:
+
+| State | Background | Text | Border |
+|-------|-----------|------|--------|
+| **Default** | `bg-transparent` | `text-body` | `border border-secondary` |
+| **Active** | `bg-primary` | `text-white` | none |
+| **Hover** | `bg-canvas` | `text-headers` | `border border-secondary` |
+| **Disabled** (prev/next) | `bg-transparent` | `text-labels/40` | `border border-secondary/40` |
+
+**Page Button Size**: `w-8 h-8` (32px square), `rounded-md`, `text-sm`
+
+**Ellipsis Logic**:
+- Show first page, last page, and up to 3 pages around current page
+- Use "…" for gaps between page ranges
+- Example for page 7 of 20: `1 … 6 [7] 8 … 20`
+
+**Visual Specification (Mobile <768px)**:
+
+```
+┌──────────────────────────────────────┐
+│   [◀ Prev]   Page 3 of 13   [Next ▶]   │
+└──────────────────────────────────────┘
+```
+
+- Simplified: prev/next buttons + "Page X of Y" text only
+- No individual page number buttons on mobile
+- Prev/Next buttons: `min-w-[80px]`, `h-10` (40px), touch-friendly
+
+**ARIA Requirements**:
+- Container: `<nav aria-label="Pagination">`
+- Active page: `aria-current="page"`
+- Prev/Next: `aria-label="Go to previous page"` / `aria-label="Go to next page"`
+- Disabled buttons: `aria-disabled="true"`
+
+### 26.17.2 SearchBar Component
+
+**Component**: `ui/SearchBar.svelte`
+
+**Props Interface**:
+```typescript
+interface Props {
+  value: string;                // Current search value (bindable)
+  placeholder?: string;        // Placeholder text (default: "Search…")
+  debounceMs?: number;         // Debounce delay (default: 300)
+  minLength?: number;          // Min chars before search fires (default: 2)
+  onSearch: (query: string) => void;  // Callback with debounced query
+  class?: string;
+}
+```
+
+**Visual Specification**:
+
+```
+┌──────────────────────────────────────┐
+│  🔍  Search problems…          [×]  │
+└──────────────────────────────────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Height | 40px (desktop), 44px (mobile) |
+| Background | `bg-card` |
+| Border | `1px solid --color-secondary` |
+| Border (focus) | `2px solid --color-primary` |
+| Border radius | `rounded-lg` |
+| Padding | `pl-10 pr-10` (room for icon and clear button) |
+| Font | `text-sm`, `text-body` |
+| Placeholder | `text-labels` |
+
+**Search Icon**: Lucide `Search`, 16px, `text-labels`, positioned `left-3`
+
+**Clear Button**: Lucide `X`, 16px, `text-labels`, positioned `right-3`. Visible only when `value.length > 0`. On click: clears input, fires `onSearch("")`, focuses input.
+
+**Behavior**:
+- Debounce: fires `onSearch` after `debounceMs` of no input
+- Below `minLength`: fires `onSearch("")` to clear results
+- `Escape` key: clears input
+- No form submission on Enter (search is live)
+
+**ARIA Requirements**:
+- Input: `role="searchbox"`, `aria-label="Search"`
+- Clear button: `aria-label="Clear search"`
+
+### 26.17.3 ListFilterBar Component
+
+**Component**: `ui/ListFilterBar.svelte`
+
+**Props Interface**:
+```typescript
+interface FilterOption {
+  value: string;
+  label: string;
+}
+
+interface FilterConfig {
+  key: string;              // URL param key (e.g., "readiness")
+  label: string;            // Display label (e.g., "Readiness State")
+  options: FilterOption[];   // Available options
+  defaultValue: string;     // Default value (usually "all")
+}
+
+interface Props {
+  filters: FilterConfig[];
+  values: Record<string, string>;   // Current filter values
+  onFilterChange: (key: string, value: string) => void;
+  showClearAll?: boolean;   // Show "Clear all" when non-default filters active
+  onClearAll?: () => void;
+  class?: string;
+}
+```
+
+**Visual Specification (Desktop ≥768px)**:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ [All States ▼]  [All Types ▼]  [Newest First ▼]  Clear all │
+└──────────────────────────────────────────────────────┘
+```
+
+| Property | Value |
+|----------|-------|
+| Layout | `flex flex-wrap items-center gap-2` |
+| Filter select | Native `<select>` or bits-ui Select, `h-9`, `rounded-md` |
+| Filter select bg | `bg-card`, `border border-secondary` |
+| Active filter (non-default) | `border-primary`, `text-primary`, `font-medium` |
+| "Clear all" link | `text-sm`, `text-primary`, `underline`, visible only when non-default filters active |
+
+**Visual Specification (Mobile <768px)**: Two layout options (implementation choice):
+
+**Option A — Horizontal Pill Bar**:
+```
+┌──────────────────────────────────────┐
+│ [All States] [All Types] [Newest ▶] │  ← horizontally scrollable
+└──────────────────────────────────────┘
+```
+- Horizontally scrollable container (`overflow-x-auto`, `flex-nowrap`)
+- Pill-shaped buttons (`rounded-full`, `px-3 py-1.5`, `text-sm`)
+- Tap opens a native select or bottom sheet for that filter
+
+**Option B — Filter Button + Bottom Sheet** (Ch.26.11.18 FilterBottomSheet):
+```
+┌──────────────────────────────────────┐
+│ [🔽 Filters (2 active)]             │  ← tap opens bottom sheet
+└──────────────────────────────────────┘
+```
+- Single "Filters" button showing active filter count
+- Tap opens FilterBottomSheet with all filter options
+
+**ARIA Requirements**:
+- Container: `role="group"`, `aria-label="Filters"`
+- Each select: `aria-label="{filter label}"`
+- Clear all: `aria-label="Clear all filters"`
+
+### 26.17.4 Sort Select
+
+Sort is a special filter rendered as a standalone select (not inside ListFilterBar) when the page design places it separately. Uses the same styling as ListFilterBar selects.
+
+```typescript
+interface SortOption {
+  value: string;         // e.g., "newest", "oldest", "alpha"
+  label: string;         // e.g., "Newest First"
+}
+```
+
+When sort is part of the filter bar, it is included as a regular `FilterConfig` entry with `key: "sort"`.
+
+### 26.17.5 Files
+
+| Component | Path |
+|-----------|------|
+| Pagination | `ui/Pagination.svelte` |
+| SearchBar | `ui/SearchBar.svelte` |
+| ListFilterBar | `ui/ListFilterBar.svelte` |
+
+These components are placed in the `ui/` directory alongside existing shadcn-style primitives.
+
+---
+
+*This addendum captures UI design decisions. Section 26.1-26.10 established 2026-01-29. Section 26.11 added 2026-02-04 documenting the shadcn-svelte component system. Sections 26.11.10-26.11.22, 26.12, and 26.15 added 2026-02-05 for mobile admin support and chat UI. Section 26.16 added 2026-02-25 for global navigation chrome (split navigation pattern). Section 26.17 added 2026-02-25 for scalable list view components (pagination, search, filtering).*

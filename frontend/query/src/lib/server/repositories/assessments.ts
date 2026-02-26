@@ -156,11 +156,13 @@ export interface RenderStructure {
 	major_version: number | null;
 	time_context: 'pitch' | 'review' | 'pre_event' | 'post_event' | 'late_reflection';
 	is_open: boolean;
+	timer_ends_at: string | null;
 	render_type: 'single_matrix' | 'mixed_matrices';
 	matrix: {
 		max_rating: number;
 		common_headers: Array<{ rating_value: number; label: string }>;
 		rows: Array<{
+			position_index: number;
 			item_id: string;
 			item_key: string;
 			short_label: string;
@@ -169,6 +171,22 @@ export interface RenderStructure {
 			current_rating: number | null;
 		}>;
 	};
+}
+
+/**
+ * Get the timer_ends_at for an event's live context.
+ * Used to include countdown info in the assessment render structure.
+ */
+export function getTimerForAssessment(eventId: string): string | null {
+	const db = getDatabase();
+
+	const row = db.prepare(`
+		SELECT timer_ends_at
+		FROM event_live_context
+		WHERE event_id = ? AND current_mode != 'idle'
+	`).get(eventId) as { timer_ends_at: string | null } | undefined;
+
+	return row?.timer_ends_at ?? null;
 }
 
 /**
@@ -182,12 +200,14 @@ export function buildRenderStructure(
 	resolvedItems: Map<string, Item>,
 	problemId: string | null = null,
 	majorVersion: number | null = null,
-	closedAt: string | null = null
+	closedAt: string | null = null,
+	timerEndsAt: string | null = null
 ): RenderStructure {
 	// Build rows from resolved items in order
 	const rows: RenderStructure['matrix']['rows'] = [];
 
-	for (const ii of inventoryItems) {
+	for (let idx = 0; idx < inventoryItems.length; idx++) {
+		const ii = inventoryItems[idx];
 		const item = resolvedItems.get(ii.item_key);
 		if (!item) {
 			console.warn(`Item key ${ii.item_key} not found in resolved items`);
@@ -195,6 +215,7 @@ export function buildRenderStructure(
 		}
 
 		rows.push({
+			position_index: ii.position_index ?? idx,
 			item_id: item.item_id,
 			item_key: item.item_key,
 			short_label: item.short_label,
@@ -270,6 +291,7 @@ export function buildRenderStructure(
 		major_version: majorVersion,
 		time_context: timeContext,
 		is_open: closedAt === null,
+		timer_ends_at: timerEndsAt,
 		render_type: isConsistent ? 'single_matrix' : 'mixed_matrices',
 		matrix: {
 			max_rating: maxRating,

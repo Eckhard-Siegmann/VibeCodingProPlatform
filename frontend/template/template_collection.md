@@ -1,7 +1,7 @@
 # VibeCoding Frontend Template Collection
 
-**Version**: 1.0.0
-**Last Updated**: 2026-02-04
+**Version**: 1.1.0
+**Last Updated**: 2026-02-26
 **Purpose**: Comprehensive design system and component library for the VibeCoding Professionals event platform
 
 ---
@@ -621,6 +621,11 @@ interface Props {
 - `ui/data-table/` - Responsive table (desktop=table, mobile=cards)
 - `ui/table-card/` - Mobile card view for table rows
 - `ui/filter-bar/` - FilterBar, FilterBottomSheet, FilterDropdown, FilterCheckbox
+
+**Scalable List Views** (added 2026-02-25, documented in Section 5.4–5.6):
+- `ui/SearchBar.svelte` - Debounced search input (300ms, min 2 chars, Escape clears)
+- `ui/ListFilterBar.svelte` - Desktop dropdown selects / mobile pill bar with AND logic
+- `ui/Pagination.svelte` - Desktop numbered pages / mobile prev-next, standard response shape
 
 **Charts** (documented in Section 10):
 - `charts/BarChart.svelte` - Chart.js wrapper for bar charts
@@ -1294,6 +1299,252 @@ Feb 6, 2026
 
 **Source**: `DecisionTimeline.svelte:1-94`, Ch.13.6.4, Ch.10
 
+### 5.4 SearchBar Component
+
+**Added 2026-02-25**
+
+**File**: `frontend/query/src/lib/components/ui/SearchBar.svelte`
+
+**Purpose**: Debounced search input for server-side filtering of list views. Used on Problem Backlog, Events Listing, Admin pages, Queue Planning, and Attendance Tracking.
+
+**Props Interface**:
+```typescript
+interface Props {
+  value: string;
+  placeholder?: string;          // default "Search..."
+  debounceMs?: number;           // default 300
+  minLength?: number;            // default 2 (below 2 chars, clears filter)
+  onSearch: (query: string) => void;
+  class?: string;
+}
+```
+
+**Visual**:
+```
+┌──────────────────────────────────────────┐
+│ 🔍 Search problems...___________    [×] │
+└──────────────────────────────────────────┘
+```
+
+**Styling**:
+- Container: `relative flex items-center`
+- Input: `w-full pl-10 pr-10 py-2 bg-card border border-secondary rounded-lg text-sm`
+- Search icon (Lucide `Search`): `absolute left-3 w-4 h-4 text-labels`
+- Clear button (Lucide `X`): `absolute right-3 w-4 h-4 text-labels hover:text-headers`, visible only when value is non-empty
+- Focus: `focus:ring-2 focus:ring-primary/20 focus:border-primary`
+
+**Behavior**:
+- Debounces keystrokes by `debounceMs` (default 300ms)
+- Below `minLength` (default 2 chars): Calls `onSearch("")` to clear the filter
+- Escape key: Clears input and calls `onSearch("")`
+- No form submission on Enter (search is live)
+
+**ARIA**:
+- `role="searchbox"`
+- `aria-label="Search"` (or custom via placeholder)
+- Clear button: `aria-label="Clear search"`
+
+**Code Example**:
+```svelte
+<script>
+  import SearchBar from '$lib/components/ui/SearchBar.svelte';
+  let searchQuery = $state('');
+</script>
+
+<SearchBar
+  value={searchQuery}
+  placeholder="Search problems..."
+  onSearch={(q) => { searchQuery = q; goto(`?search=${q}&page=1`); }}
+/>
+```
+
+**Spec Source**: Ch.12.10.2, Ch.26.17.2
+
+### 5.5 ListFilterBar Component
+
+**Added 2026-02-25**
+
+**File**: `frontend/query/src/lib/components/ui/ListFilterBar.svelte`
+
+**Purpose**: Multi-filter bar with dropdown selects (desktop) and horizontal scrollable pills (mobile). Filters combine with AND logic, each change resets to page 1.
+
+**Props Interface**:
+```typescript
+interface FilterConfig {
+  key: string;                // URL param name (e.g., 'readiness')
+  label: string;              // Display label (e.g., 'Readiness')
+  options: FilterOption[];    // Available options
+  defaultValue?: string;      // Default = show all (empty)
+}
+
+interface FilterOption {
+  value: string;
+  label: string;
+  separator?: boolean;        // Visual separator before this option
+}
+
+interface Props {
+  filters: FilterConfig[];
+  values: Record<string, string>;
+  onFilterChange: (key: string, value: string) => void;
+  showClearAll?: boolean;     // default true
+  class?: string;
+}
+```
+
+**Visual (Desktop ≥768px)** — Inline dropdown selects:
+```
+┌──────────────────────────────────────────────────────┐
+│ Readiness [All ▼]  Type [All ▼]  Location [All ▼]   │
+│                                        [Clear all]   │
+└──────────────────────────────────────────────────────┘
+```
+
+**Visual (Mobile <768px)** — Horizontal scrollable pill bar:
+```
+┌──────────────────────────────────────────┐
+│ [All States] [Greenfield ✓] [Cologne ✓] │ ← Scroll →
+│                              [Clear all]  │
+└──────────────────────────────────────────┘
+```
+
+**Styling**:
+- Desktop container: `flex items-center gap-3 flex-wrap`
+- Desktop select: `<select>` styled with `bg-card border border-secondary rounded-md px-3 py-1.5 text-sm`
+- Mobile container: `flex gap-2 overflow-x-auto pb-2` (horizontal scroll)
+- Mobile pill (inactive): `whitespace-nowrap rounded-full px-3 py-1 text-sm bg-canvas text-labels border border-secondary`
+- Mobile pill (active): `bg-primary/10 text-primary border-primary`
+- "Clear all" link: `text-sm text-primary hover:text-primary-hover cursor-pointer`, hidden when all filters are default
+
+**Behavior**:
+- Filter change → calls `onFilterChange(key, newValue)` → parent resets to page 1
+- "Clear all" → resets all filters to default values
+- Filters combine with AND logic (server-side)
+
+**ARIA**:
+- Each select: `aria-label="{filter label}"`
+- Mobile pills: `role="listbox"`, each pill `role="option"`, `aria-selected`
+- Clear all: `aria-label="Clear all filters"`
+
+**Code Example**:
+```svelte
+<script>
+  import ListFilterBar from '$lib/components/ui/ListFilterBar.svelte';
+
+  const filters = [
+    { key: 'readiness', label: 'Readiness', options: [
+      { value: '', label: 'All States' },
+      { value: 'ready', label: 'Ready' },
+      { value: 'submitted', label: 'Submitted' },
+    ]},
+    { key: 'type', label: 'Type', options: [
+      { value: '', label: 'All Types' },
+      { value: 'greenfield', label: 'Greenfield' },
+      { value: 'brownfield', label: 'Brownfield' },
+    ]},
+  ];
+
+  let filterValues = $state({ readiness: '', type: '' });
+</script>
+
+<ListFilterBar
+  {filters}
+  values={filterValues}
+  onFilterChange={(key, val) => {
+    filterValues = { ...filterValues, [key]: val };
+    goto(`?${new URLSearchParams(filterValues)}&page=1`);
+  }}
+/>
+```
+
+**Spec Source**: Ch.12.10.3, Ch.26.17.3
+
+### 5.6 Pagination Component
+
+**Added 2026-02-25**
+
+**File**: `frontend/query/src/lib/components/ui/Pagination.svelte`
+
+**Purpose**: Server-side pagination control with desktop numbered pages and mobile simplified prev/next. All paginated endpoints return the standard `{ items, pagination: { page, pageSize, totalItems, totalPages } }` response shape (Ch.12.10.1).
+
+**Props Interface**:
+```typescript
+interface Props {
+  page: number;               // Current page (1-indexed)
+  totalPages: number;
+  totalItems: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  class?: string;
+}
+```
+
+**Visual (Desktop ≥768px)** — Numbered pages:
+```
+┌───────────────────────────────────────────────────────┐
+│ Showing 21-40 of 247         [◀] 1 2 [3] 4 … 13 [▶] │
+└───────────────────────────────────────────────────────┘
+```
+
+**Visual (Mobile <768px)** — Simplified:
+```
+┌──────────────────────────────────────────┐
+│ [◀ Prev]   Page 3 of 13   [Next ▶]      │
+└──────────────────────────────────────────┘
+```
+
+**Styling**:
+- Container: `flex items-center justify-between`
+- "Showing X-Y of Z" label: `text-sm text-labels` (desktop only, hidden on mobile)
+- Page buttons: `w-8 h-8 rounded-md text-sm flex items-center justify-center`
+  - Current page: `bg-primary text-white font-semibold`
+  - Other pages: `bg-card text-headers hover:bg-canvas border border-secondary`
+  - Ellipsis: `text-labels cursor-default` (not clickable)
+- Prev/Next buttons: `px-3 py-1.5 rounded-md text-sm bg-card border border-secondary text-headers hover:bg-canvas`
+  - Disabled (first/last page): `opacity-50 cursor-not-allowed`
+
+**Ellipsis Logic** (desktop):
+- Always show: first page, last page, current page, 1 page on each side of current
+- Gap of 2+ pages → show `…`
+- Example: page 7 of 13 → `1 … 6 [7] 8 … 13`
+
+**"Load More" Alternative**:
+
+Some views use "Load More" instead of numbered pagination (activity feeds, attendance tracking, pending review backlog). These do NOT use the Pagination component — they use a simple button:
+```svelte
+<Button variant="outline" size="sm" onclick={loadMore}>
+  Load {batchSize} more (showing {shown} of {total})
+</Button>
+```
+The "Load More" pattern is preferred when:
+- Users process items sequentially (queues, feeds)
+- Checkbox state must survive across loads
+- The list is a dashboard sub-section, not a standalone page
+
+**ARIA**:
+- Container: `<nav aria-label="Pagination">`
+- Current page: `aria-current="page"`
+- Prev button: `aria-label="Go to previous page"`
+- Next button: `aria-label="Go to next page"`
+- Page buttons: `aria-label="Go to page {n}"`
+
+**Code Example**:
+```svelte
+<script>
+  import Pagination from '$lib/components/ui/Pagination.svelte';
+</script>
+
+<Pagination
+  page={3}
+  totalPages={13}
+  totalItems={247}
+  pageSize={20}
+  onPageChange={(p) => goto(`?page=${p}`)}
+/>
+```
+
+**Spec Source**: Ch.12.10.1, Ch.12.10.6, Ch.26.17.1
+
 ---
 
 ## 6. Navigation Templates
@@ -1428,6 +1679,153 @@ Versions:  [v1.00]  [v2.00]  [●v3.00]    ← Current highlighted
 **User Stories**: U26 (View Historical Versions), audit trail
 
 **Source**: `VersionNav.svelte:1-73`, Ch.13.5
+
+### 6.4 TopAppBar Component (NEEDED)
+
+**Added 2026-02-25**
+
+**File**: `frontend/query/src/lib/components/layout/TopAppBar.svelte`
+
+**Purpose**: Persistent top bar with platform brand (left) and user avatar (right). Provides identity anchor and account menu access on all authenticated pages.
+
+**Props Interface**:
+```typescript
+interface Props {
+  user: {
+    display_name: string;
+    user_id: string;
+  } | null;
+  class?: string;
+}
+```
+
+**Visual**:
+```
+┌──────────────────────────────────────────┐
+│  VibeCoding                      [EH]   │
+└──────────────────────────────────────────┘
+```
+
+**Styling**:
+- Position: `fixed top-0 left-0 right-0 z-50`
+- Height: `h-[44px] md:h-[48px]`
+- Background: `bg-card`
+- Border: `border-b border-secondary`
+- Shadow: `shadow-[--shadow-resting]`
+- Layout: `flex items-center justify-between px-4 md:px-6`
+
+**Left Region**:
+- Text: "VibeCoding", `font-semibold text-lg text-headers`
+- Desktop addition: Tagline "Professionals" in `text-sm text-labels ml-1`
+
+**Right Region**:
+- InitialAvatar (Ch.26.11.16), `size="sm"`
+- `onclick` → open AccountMenu
+- `aria-haspopup="menu"`, `aria-expanded`
+
+**AccountMenu**:
+- Desktop: DropdownMenu (bits-ui), aligned right
+- Mobile: Bottom sheet (bits-ui Dialog)
+- Items: Display name (header), email (sub), Settings, Profile, Logout
+- Logout uses `text-alert` color
+
+**Code Example**:
+```svelte
+<TopAppBar user={{ display_name: "Eva Schmidt", user_id: "abc-123" }} />
+```
+
+**User Stories**: U39 (Account Access via Avatar)
+
+**Spec Source**: Ch.12.7.2, Ch.26.16.1
+
+### 6.5 BottomNavBar Component (NEEDED)
+
+**Added 2026-02-25**
+
+**File**: `frontend/query/src/lib/components/layout/BottomNavBar.svelte`
+
+**Purpose**: Fixed bottom navigation bar for single-tap screen switching. Always visible on authenticated pages. Replaces hamburger menus with direct, thumb-accessible route icons.
+
+**Props Interface**:
+```typescript
+interface NavItem {
+  icon: Component;       // Lucide icon component
+  label: string;         // Short label (max 10 chars)
+  href: string;          // Route path
+  badge?: number;        // Optional notification count
+  visibleTo?: string[];  // Role restriction
+}
+
+interface Props {
+  items: NavItem[];
+  currentPath: string;
+  class?: string;
+}
+```
+
+**Visual**:
+```
+┌──────────┬──────────┬──────────┐
+│    ━━━   │          │          │   ← Active indicator (3px bar)
+│    🏠    │    📅    │    📋    │
+│   Home   │  Events  │ Problems │
+│ (active) │          │          │
+└──────────┴──────────┴──────────┘
+```
+
+**Styling**:
+- Position: `fixed bottom-0 left-0 right-0 z-50`
+- Height: `h-[56px] md:h-[60px]`
+- Background: `bg-card`
+- Border: `border-t border-secondary`
+- Shadow: `shadow-[0px_-1px_3px_rgba(0,0,0,0.05)]`
+- Layout: `flex items-center justify-around`
+- Safe area: `pb-[env(safe-area-inset-bottom)]` (iPhone notch/home indicator)
+
+**Item Layout**:
+```
+flex flex-col items-center justify-center gap-0.5
+```
+- Icon: 24px Lucide icon
+- Label: `text-xs font-medium`
+- Touch target: Entire column, min 48×48px
+
+**States**:
+| State | Icon | Label | Extra |
+|-------|------|-------|-------|
+| Inactive | `text-labels` | `text-labels` | — |
+| Active | `text-primary` | `text-primary` | 3px `bg-primary` bar above icon |
+| Hover | `text-headers` | `text-headers` | `bg-canvas` background |
+
+**Badge**:
+- Position: Top-right of icon, overlapping
+- Dot only: `w-2 h-2 bg-alert rounded-full`
+- With count: `w-4 h-4 bg-alert text-white text-[10px] rounded-full`
+
+**Code Example**:
+```svelte
+<script>
+  import { Home, Calendar, ClipboardList } from '@lucide/svelte';
+  import BottomNavBar from '$lib/components/layout/BottomNavBar.svelte';
+  import { page } from '$app/stores';
+
+  const items = [
+    { icon: Home, label: 'Home', href: '/dashboard' },
+    { icon: Calendar, label: 'Events', href: '/events' },
+    { icon: ClipboardList, label: 'Problems', href: '/problems' },
+  ];
+</script>
+
+<BottomNavBar {items} currentPath={$page.url.pathname} />
+```
+
+**ARIA**:
+- Container: `<nav role="navigation" aria-label="Main navigation">`
+- Active item: `aria-current="page"`
+
+**User Stories**: U38 (Switch Screens), U40 (Current Location), M29 (Moderator Access)
+
+**Spec Source**: Ch.12.7.3, Ch.26.16.2
 
 ---
 
@@ -2516,7 +2914,12 @@ interface Props {
 - ✅ TableCard (mobile card view)
 - ✅ ActionMenu (⋮ three-dot menu)
 
-**Filters**:
+**Scalable List Views** (added 2026-02-25):
+- ✅ SearchBar (debounced search input, 300ms, min 2 chars)
+- ✅ ListFilterBar (dropdown selects desktop, pill bar mobile, AND logic)
+- ✅ Pagination (numbered desktop, prev/next mobile, standard response shape)
+
+**Filters** (legacy, predates scalable list view components):
 - ✅ FilterBar (desktop inline)
 - ✅ FilterBottomSheet (mobile drawer)
 - ✅ FilterDropdown (primitive)
@@ -2601,20 +3004,18 @@ interface Props {
 - ✅ ResultsTable
 - ✅ ImprovementPriorities
 
-**Total**: 59 components implemented (2026-02-05)
+**Total**: 62 components implemented (2026-02-25)
 
-**Specification Reference**: See Ch.26.11-26.15 for complete component specifications and page design documents in `frontend/pagedesign/` for composition patterns.
+**Specification Reference**: See Ch.26.11-26.17 for complete component specifications and page design documents in `frontend/pagedesign/` for composition patterns.
 
 ### Future Components (Deferred)
 
 - ⬜ Breadcrumbs (navigation, low priority)
-- ⬜ SearchInput (full-text search, Ch.12.7, low priority)
 - ⬜ NotificationCenter (centralized notifications, future)
 - ⬜ UserProfile (profile pages, future)
-- ⬜ ChatThread (threaded replies within team chat, future)
 
 ---
 
-**End of Template Collection v1.0.0**
+**End of Template Collection v1.1.0**
 
 This document provides the foundation for all frontend development on the VibeCoding Professionals platform. All implementations must follow these patterns, use these design tokens, and maintain the three-layer depth hierarchy that defines the platform's visual identity.

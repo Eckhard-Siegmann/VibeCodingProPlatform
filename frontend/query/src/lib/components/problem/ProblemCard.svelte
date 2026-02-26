@@ -10,7 +10,7 @@
 	 * - EtchedSeparator between major Card sections
 	 */
 	import type { ProblemVersion, Decision, AssessmentSummary } from '$lib/server/repositories/problems';
-	import PrivateWarningBanner from './PrivateWarningBanner.svelte';
+	import OwnerBanner from './OwnerBanner.svelte';
 	import BestPracticesLink from './BestPracticesLink.svelte';
 	import ClassificationBadge from './ClassificationBadge.svelte';
 	import ProblemHeader from './ProblemHeader.svelte';
@@ -22,6 +22,8 @@
 	import AssessmentLinks from './AssessmentLinks.svelte';
 	import LessonsLearnedLog from './LessonsLearnedLog.svelte';
 	import DualStateExplanation from './DualStateExplanation.svelte';
+	import ResourceList from './ResourceList.svelte';
+	import type { Resource } from './ResourceList.svelte';
 	import ModeratorControls from './ModeratorControls.svelte';
 	import POActionBar from './POActionBar.svelte';
 	import ConfirmDialog from '$lib/components/ui/ConfirmDialog.svelte';
@@ -58,8 +60,18 @@
 		displayName: string;
 	}
 
+	interface RepoSnapshot {
+		snapshot_id: string;
+		problem_id: string;
+		major_version: number;
+		minor_version: number;
+		head_commit_sha: string;
+		first_seen_at: string;
+	}
+
 	interface Flags {
-		showWarningBanner: boolean;
+		showOwnerBanner: boolean;
+		isDeputy: boolean;
 		showBestPracticesLink: boolean;
 		canEdit: boolean;
 		showSubmitButton: boolean;
@@ -71,13 +83,17 @@
 		isMember?: boolean;
 		canJoinTeam?: boolean;
 		canEditBreakout?: boolean;
+		canAddResources?: boolean;
+		canEditResources?: boolean;
+		canSuggestResources?: boolean;
+		canApproveResources?: boolean;
 	}
 
 	interface Props {
 		problem: Problem;
 		currentVersion: ProblemVersion;
 		versions: ProblemVersion[];
-		decisions: Decision[];
+		decisions?: Decision[];
 		assessments: AssessmentSummary[];
 		flags: Flags;
 		isArchivedView: boolean;
@@ -91,6 +107,10 @@
 		currentUserId?: string;
 		isPitchOpen?: boolean;
 		isReviewOpen?: boolean;
+		// Resource data (Ch.6.2)
+		directResources?: Resource[];
+		helpfulResources?: Resource[];
+		latestSnapshot?: RepoSnapshot | null;
 		// Handlers
 		onVersionSelect: (majorVersion: number) => void;
 		onFieldUpdate?: (field: string, value: string | number) => Promise<boolean>;
@@ -106,13 +126,19 @@
 		onSendMessage?: (message: string, replyToId?: string) => void;
 		onReactToMessage?: (messageId: string, emoji: string) => void;
 		onDecision?: (decisionType: string, comment?: string) => void;
+		// Resource handlers (Ch.6.2)
+		onAddResource?: (resourceType: 'direct' | 'helpful') => void;
+		onEditResource?: (resourceId: string) => void;
+		onDeleteResource?: (resourceId: string) => void;
+		onApproveResource?: (resourceId: string) => void;
+		onRejectResource?: (resourceId: string) => void;
 	}
 
 	let {
 		problem,
 		currentVersion,
 		versions,
-		decisions,
+		decisions = [],
 		assessments,
 		flags,
 		isArchivedView,
@@ -125,6 +151,9 @@
 		currentUserId,
 		isPitchOpen = false,
 		isReviewOpen = false,
+		directResources = [],
+		helpfulResources = [],
+		latestSnapshot,
 		onVersionSelect,
 		onFieldUpdate,
 		onSubmit,
@@ -138,7 +167,12 @@
 		onUpdateBreakout,
 		onSendMessage,
 		onReactToMessage,
-		onDecision
+		onDecision,
+		onAddResource,
+		onEditResource,
+		onDeleteResource,
+		onApproveResource,
+		onRejectResource
 	}: Props = $props();
 
 	// Dialog state
@@ -147,11 +181,11 @@
 	let actionInProgress = $state(false);
 	let showStateHelp = $state(false);
 
-	// User role for guidance
+	// User role for guidance (PO and Deputy both get problem_owner guidance)
 	const userRole = $derived(
 		flags.isModerator
 			? 'moderator'
-			: flags.isOwner
+			: flags.isOwner || flags.isDeputy
 				? 'problem_owner'
 				: flags.isMember
 					? 'developer'
@@ -213,9 +247,12 @@
 </script>
 
 <div class="space-y-4">
-	<!-- Private View Warning Banner -->
-	{#if flags.showWarningBanner}
-		<PrivateWarningBanner />
+	<!-- Owner/Deputy Banner (Ch.13.2) -->
+	{#if flags.showOwnerBanner}
+		<OwnerBanner
+			role={flags.isDeputy ? 'deputy' : 'owner'}
+			readinessState={problem.readiness_state}
+		/>
 	{/if}
 
 	<!-- Best Practices Link (draft mode only) -->
@@ -267,7 +304,7 @@
 		{userRole}
 		{isPitchOpen}
 		{isReviewOpen}
-		isOwner={flags.isOwner}
+		isOwner={flags.isOwner || flags.isDeputy}
 		isMember={flags.isMember}
 		onSubmit={flags.showSubmitButton ? handleSubmitClick : undefined}
 		onEdit={flags.canEdit ? handleModify : undefined}
@@ -279,7 +316,51 @@
 	<!-- Description & Resources Section (collapsible on mobile, open by default) -->
 	<div class="md:hidden">
 		<AccordionSection title="Description & Resources" defaultOpen={true}>
-			<ProblemContent version={currentVersion} canEdit={flags.canEdit} {onFieldUpdate} />
+			<ProblemContent
+				version={currentVersion}
+				canEdit={flags.canEdit}
+				{onFieldUpdate}
+				{latestSnapshot}
+			/>
+			<!-- Resource Lists (Ch.6.2, Ch.13.1) -->
+			{#if directResources.length > 0 || flags.canAddResources || flags.canSuggestResources}
+				<div class="mt-4">
+					<ResourceList
+						resources={directResources}
+						resourceType="direct"
+						canAdd={flags.canAddResources}
+						canEdit={flags.canEditResources}
+						canSuggest={flags.canSuggestResources}
+						canApprove={flags.canApproveResources}
+						showPendingSuggestions={flags.canApproveResources}
+						onAdd={() => onAddResource?.('direct')}
+						onEdit={onEditResource}
+						onDelete={onDeleteResource}
+						onSuggest={() => onAddResource?.('direct')}
+						onApprove={onApproveResource}
+						onReject={onRejectResource}
+					/>
+				</div>
+			{/if}
+			{#if helpfulResources.length > 0 || flags.canAddResources || flags.canSuggestResources}
+				<div class="mt-4">
+					<ResourceList
+						resources={helpfulResources}
+						resourceType="helpful"
+						canAdd={flags.canAddResources}
+						canEdit={flags.canEditResources}
+						canSuggest={flags.canSuggestResources}
+						canApprove={flags.canApproveResources}
+						showPendingSuggestions={flags.canApproveResources}
+						onAdd={() => onAddResource?.('helpful')}
+						onEdit={onEditResource}
+						onDelete={onDeleteResource}
+						onSuggest={() => onAddResource?.('helpful')}
+						onApprove={onApproveResource}
+						onReject={onRejectResource}
+					/>
+				</div>
+			{/if}
 		</AccordionSection>
 	</div>
 	<div class="hidden md:block">
@@ -287,7 +368,49 @@
 			<CardHeader>
 				<CardTitle>Description</CardTitle>
 			</CardHeader>
-			<ProblemContent version={currentVersion} canEdit={flags.canEdit} {onFieldUpdate} />
+			<ProblemContent
+				version={currentVersion}
+				canEdit={flags.canEdit}
+				{onFieldUpdate}
+				{latestSnapshot}
+			/>
+			<!-- Resource Lists (Ch.6.2, Ch.13.1) -->
+			<div class="px-4 md:px-5 pb-4 md:pb-5 space-y-4">
+				{#if directResources.length > 0 || flags.canAddResources || flags.canSuggestResources}
+					<ResourceList
+						resources={directResources}
+						resourceType="direct"
+						canAdd={flags.canAddResources}
+						canEdit={flags.canEditResources}
+						canSuggest={flags.canSuggestResources}
+						canApprove={flags.canApproveResources}
+						showPendingSuggestions={flags.canApproveResources}
+						onAdd={() => onAddResource?.('direct')}
+						onEdit={onEditResource}
+						onDelete={onDeleteResource}
+						onSuggest={() => onAddResource?.('direct')}
+						onApprove={onApproveResource}
+						onReject={onRejectResource}
+					/>
+				{/if}
+				{#if helpfulResources.length > 0 || flags.canAddResources || flags.canSuggestResources}
+					<ResourceList
+						resources={helpfulResources}
+						resourceType="helpful"
+						canAdd={flags.canAddResources}
+						canEdit={flags.canEditResources}
+						canSuggest={flags.canSuggestResources}
+						canApprove={flags.canApproveResources}
+						showPendingSuggestions={flags.canApproveResources}
+						onAdd={() => onAddResource?.('helpful')}
+						onEdit={onEditResource}
+						onDelete={onDeleteResource}
+						onSuggest={() => onAddResource?.('helpful')}
+						onApprove={onApproveResource}
+						onReject={onRejectResource}
+					/>
+				{/if}
+			</div>
 		</Card>
 	</div>
 
@@ -296,11 +419,11 @@
 	<!-- Assessments Section (collapsible on mobile, open by default) -->
 	<div class="md:hidden">
 		<AccordionSection title="Assessments" defaultOpen={true}>
-			<AssessmentLinks {assessments} isPrivateView={problem.view_type === 'private'} />
+			<AssessmentLinks {assessments} isPrivateView={flags.showOwnerBanner} />
 		</AccordionSection>
 	</div>
 	<div class="hidden md:block">
-		<AssessmentLinks {assessments} isPrivateView={problem.view_type === 'private'} />
+		<AssessmentLinks {assessments} isPrivateView={flags.showOwnerBanner} />
 	</div>
 
 	<EtchedSeparator class="my-4" />
@@ -311,7 +434,7 @@
 			<LessonsLearnedLog
 				{lessons}
 				canAddLesson={!isArchivedView}
-				canFlagValuable={flags.isModerator || flags.isOwner}
+				canFlagValuable={flags.isModerator || flags.isOwner || flags.isDeputy}
 				{currentUserId}
 				onAddLesson={onAddLesson}
 				{onFlagValuable}
@@ -322,7 +445,7 @@
 		<LessonsLearnedLog
 			{lessons}
 			canAddLesson={!isArchivedView}
-			canFlagValuable={flags.isModerator || flags.isOwner}
+			canFlagValuable={flags.isModerator || flags.isOwner || flags.isDeputy}
 			{currentUserId}
 			onAddLesson={onAddLesson}
 			{onFlagValuable}
@@ -443,8 +566,8 @@
 		/>
 	{/if}
 
-	<!-- PO Action Bar (private view only) -->
-	{#if problem.view_type === 'private'}
+	<!-- PO Action Bar (owner/deputy only) -->
+	{#if flags.showOwnerBanner}
 		<POActionBar
 			showSubmit={flags.showSubmitButton}
 			showModify={flags.showModifyButton}

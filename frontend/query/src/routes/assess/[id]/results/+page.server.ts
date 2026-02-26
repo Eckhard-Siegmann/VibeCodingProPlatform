@@ -12,6 +12,8 @@ import {
 	type ItemStats,
 	type ResponseFilters
 } from '$lib/server/repositories/responses';
+import { getAuthenticatedUser } from '$lib/server/auth';
+import { getDatabase } from '$lib/server/db';
 
 export interface ResultsData {
 	assessment_id: string;
@@ -31,8 +33,14 @@ export interface ResultsData {
 	};
 }
 
-export const load: PageServerLoad = async ({ params, url }) => {
+export const load: PageServerLoad = async ({ params, url, cookies }) => {
 	const { id: assessmentId } = params;
+
+	// Get user role for CSV export visibility (admin-only per Ch.15.3.4)
+	const user = getAuthenticatedUser(cookies);
+	const db = getDatabase();
+	const userRow = db.prepare('SELECT role FROM users WHERE user_id = ?').get(user.user_id) as { role: string } | undefined;
+	const isAdmin = userRow?.role === 'admin';
 
 	// Parse filter query params
 	const roleFilter = url.searchParams.get('role');
@@ -102,7 +110,8 @@ export const load: PageServerLoad = async ({ params, url }) => {
 		};
 
 		return {
-			results: resultsData
+			results: resultsData,
+			isAdmin
 		};
 	} catch (err) {
 		if (err && typeof err === 'object' && 'status' in err) throw err;

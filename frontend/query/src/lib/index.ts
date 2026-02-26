@@ -18,6 +18,11 @@ export { InfoDialog } from './components/ui/info-dialog';
 export { EmptyState } from './components/ui/empty-state';
 export { BackButton } from './components/ui/back-button';
 
+// Scalable List View components (TICKET-29, Ch.26.17)
+export { default as SearchBar } from './components/ui/SearchBar.svelte';
+export { default as ListFilterBar } from './components/ui/ListFilterBar.svelte';
+export { default as Pagination } from './components/ui/Pagination.svelte';
+
 // Components - Layout
 export { default as PageContainer } from './components/layout/PageContainer.svelte';
 export { default as Header } from './components/layout/Header.svelte';
@@ -70,8 +75,6 @@ export { getProblemColors, getAvatarColors, getColorTokens, getColor } from './u
 export { cn } from './utils';
 
 // Domain Components (barrel re-exports)
-// Note: Some types may conflict (EventData, DecisionCategory, etc.)
-// Use named imports from specific paths if needed
 export * from './components/team';
 export * from './components/chat';
 export * from './components/events';
@@ -79,6 +82,28 @@ export * from './components/analytics';
 export * from './components/charts';
 export * from './components/admin';
 export * from './components/moderation';
-export * from './components/registration';
-export * from './components/problem';
-export * from './components/dashboard';
+
+// registration: explicit to avoid EventData conflict with admin
+export { RegistrationSection, CapacityIndicator, WaitlistNotice } from './components/registration';
+export type { UserRegistration } from './components/registration';
+
+// problem: explicit to avoid DecisionType/DecisionCategory conflict with moderation
+export {
+	ProblemCard, ProblemHeader, ProblemContent, StateIndicators, VersionBadge, VersionNav,
+	DecisionTimeline, AssessmentLinks, POActionBar, OwnerBanner, BestPracticesLink,
+	ClassificationBadge, VisualJourneyMap, NextStepsGuidance, LessonsLearnedLog, LessonCard,
+	ResourceList, DualStateExplanation, ModeratorControls
+} from './components/problem';
+export type { GuidanceAction, Lesson, LessonCategory, Resource, ResourceType } from './components/problem';
+
+// dashboard: explicit to avoid DecisionAccordion conflict with moderation
+export {
+	ContributorWall, ActivityFeed, LiveBanner, CurrentActivity,
+	ReminderAlert, TemplateEditor, CommunicationsLog,
+	ReviewResultsSummary, PitchResultsSummary, StarAwardsPanel, PersonalContributions
+} from './components/dashboard';
+export type {
+	Contributor, ActivityItem, ActivityType, LiveEventData, EventPhase, OpenAssessment,
+	CommLogEntry, ReviewResult, PitchResult, ReviewScoreItem, ExistingAward,
+	ContributionBreakdown, RecentAward, PersonalContributionData
+} from './components/dashboard';

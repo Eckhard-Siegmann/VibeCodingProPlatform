@@ -80,7 +80,7 @@ Each chat message is an atomic unit with rich metadata:
 
 ### Version Tracking Rationale
 
-For problem-scoped messages, `major_version` and `minor_version` are stored directly for efficient filtering and version-scoped display. For event-wide messages (`problem_id IS NULL`), both version fields are NULL. See Chapter 19.3.23 for the complete rationale on direct version storage.
+For problem-scoped messages, `major_version` and `minor_version` are stored directly for efficient filtering and version-scoped display. For event-wide messages (`problem_id IS NULL`), both version fields are NULL. See Chapter 19.3.25 for the complete rationale on direct version storage.
 
 ### Content Limits
 
@@ -401,7 +401,7 @@ When retired coder clicks "Rejoin Team":
 
 ### Chat Display Rules
 
-Message author display is determined at render time based on **current** membership status. See Chapter 19.3.21 for the complete chat display role conventions table.
+Message author display is determined at render time based on **current** membership status. See Chapter 19.3.23 for the complete chat display role conventions table.
 
 ### WhatsApp-style System Messages
 
@@ -861,7 +861,7 @@ The event-wide channel extends beyond a single event. Messages accumulate across
   ...
   ```
 - **Cologne sees Cologne**, Aachen sees Aachen — no cross-location mixing in the timeline
-- Location derived via `events → rooms → locations` (see Ch.19.3.23 for query pattern)
+- Location derived via `events → rooms → locations` (see Ch.19.3.25 for query pattern)
 - Valuable links and insights flagged in previous events remain discoverable
 
 **UI**: This is a filter within the Event Chat tab (see §31.16.5), not a separate page: `[This Event ▼]` / `[All {City} Events]`.

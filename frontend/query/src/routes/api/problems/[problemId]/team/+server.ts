@@ -139,7 +139,7 @@ export const POST: RequestHandler = async ({ params, request }) => {
 		body = TeamActionSchema.parse(rawBody);
 	} catch (err) {
 		if (err instanceof z.ZodError) {
-			throw error(400, `Validation error: ${err.errors.map(e => e.message).join(', ')}`);
+			throw error(400, `Validation error: ${err.issues.map((e: z.ZodIssue) => e.message).join(', ')}`);
 		}
 		throw error(400, 'Invalid request body');
 	}
@@ -208,7 +208,10 @@ export const POST: RequestHandler = async ({ params, request }) => {
 			}
 
 			case 'set_breakout_url': {
-				setBreakoutRoomUrl(team.team_id, body.url);
+				setBreakoutRoomUrl(team.team_id, body.url, {
+					...chatContext,
+					problemVersionId: currentVersion.problem_version_id
+				});
 				return json({ success: true, action: 'breakout_url_updated' });
 			}
 

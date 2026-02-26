@@ -18,7 +18,7 @@
 		website_url?: string;
 		contact_name?: string;
 		contact_email?: string;
-		partner_type: 'co_working' | 'university' | 'company' | 'community';
+		partner_type: 'coworking' | 'university' | 'company' | 'community';
 	}
 
 	export interface LocationData {
@@ -69,7 +69,7 @@
 	let partnerWebsiteUrl = $state('');
 	let partnerContactName = $state('');
 	let partnerContactEmail = $state('');
-	let partnerType = $state<PartnerData['partner_type']>('co_working');
+	let partnerType = $state<PartnerData['partner_type']>('coworking');
 
 	// Location form state
 	let locationName = $state('');
@@ -97,7 +97,7 @@
 				partnerWebsiteUrl = partner?.website_url ?? '';
 				partnerContactName = partner?.contact_name ?? '';
 				partnerContactEmail = partner?.contact_email ?? '';
-				partnerType = partner?.partner_type ?? 'co_working';
+				partnerType = partner?.partner_type ?? 'coworking';
 			} else if (mode === 'location') {
 				locationName = location?.name ?? '';
 				locationAddress = location?.address ?? '';
@@ -113,7 +113,7 @@
 
 	// Partner type options
 	const partnerTypeOptions: SelectOption[] = [
-		{ value: 'co_working', label: 'Co-Working Space' },
+		{ value: 'coworking', label: 'Co-Working Space' },
 		{ value: 'university', label: 'University' },
 		{ value: 'company', label: 'Company' },
 		{ value: 'community', label: 'Community Organization' }

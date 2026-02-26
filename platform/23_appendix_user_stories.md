@@ -59,7 +59,7 @@ As an administrator, I want to promote regular users to moderator role so truste
 As an administrator, I want to configure point weights for contribution actions and review weight multipliers so the recognition system can be tuned based on community feedback.
 *(Spec: Ch.17.9.3, Ch.33.6.6, Ch.19.3.32, Ch.19.3.35)*
 
-> **Note on catalog extensibility**: Most catalog tables (readiness states, decision types, time contexts, etc.) are architectural constants that change only through the spec-first pipeline. The VARCHAR+FK pattern (Ch.25.1) enables extensibility without migrations, but adding values to structural catalogs requires coordinated spec, seed data, and frontend constant updates — not a runtime admin UI. Only `contribution_action_catalog` and `review_weight_catalog` are admin-tunable at runtime.
+> **Note on catalog extensibility**: Catalog tables fall into two categories (see Ch.17.10). **Soft catalogs** (`problem_type_catalog`, `emoji_catalog`, `lesson_category_catalog`) and **weight catalogs** (`contribution_action_catalog`, `review_weight_catalog`) are admin-tunable at runtime — administrators can add entries, edit display metadata, adjust weights, and toggle active/inactive. **Structural catalogs** (readiness states, action states, decision types, time contexts, user roles, auth providers, etc.) are architectural constants that change only through the spec-first pipeline because they drive state machines, authorization logic, or assessment lifecycles. The VARCHAR+FK pattern (Ch.25.1) enables extensibility without migrations for all catalog types.
 
 ### A15 – View System Health
 As an administrator, I want to view system status metrics and health indicators so I can monitor platform integrity and performance.
@@ -73,6 +73,14 @@ As an administrator, I want to edit event details after creation so corrections 
 As an administrator, I want to download CSV exports from analytics views and audit screens so I can use external tools for research and debug data issues without needing direct database access.
 *(Spec: Ch.12.6, Ch.15.3.4)*
 
+### A18 – Search and Paginate Admin Lists
+As an administrator, I want all admin list views (users, events, items, inventories) to support server-side pagination, keyword search, and role/status filtering so the UI remains responsive and usable when managing hundreds or thousands of entries.
+*(Spec: Ch.12.10, Ch.17.5, Ch.26.17)*
+
+### A19 – Filter Admin User List by Role
+As an administrator, I want to filter the user list by role (observer, developer, moderator, admin, agent) and email confirmation status so I can quickly find specific user groups for management tasks like promotions or CSV export.
+*(Spec: Ch.17.5, Ch.12.10.3)*
+
 ---
 
 ## 23.2 Moderator User Stories
@@ -82,8 +90,8 @@ As a moderator, I want to create a new event with partner, room, hosts, dates, a
 *(Spec: Ch.17.3, Ch.29.4)*
 
 ### M2 – View the Global Problem Backlog
-As a moderator, I want to see all submitted problems sorted by creation date, with rejected problems hidden by default.
-*(Spec: Ch.12.5)*
+As a moderator, I want to see all submitted problems sorted by creation date, with rejected problems hidden by default, using the Problem Backlog Page with moderator-only filter options to reveal rejected and dropped problems for curation purposes.
+*(Spec: Ch.12.5, Ch.12.8)*
 
 ### M3 – Review a Newly Submitted Problem
 As a moderator, I want to open a problem card and inspect its current version and metadata to judge suitability.
@@ -145,6 +153,10 @@ As a moderator, I want to set or extend a countdown timer when opening a pitch, 
 As a moderator, I want to post an announcement in the event-wide chat channel during a live event so I can communicate schedule changes, instructions, or encouragements — and the message persists for participants who join later.
 *(Spec: Ch.14.5.5, Ch.31.16)*
 
+### M17b – Monitor Automated System Activity
+As a moderator, I want to view a chronological log of all communications and automated system actions (such as waitlist expirations and auto-invites) in the dashboard so I have full transparency into what the autonomous logic is doing behind the scenes.
+*(Spec: Ch.19.3.10, ADR 010)*
+
 ### M18 – Deselect Problem from Coding
 As a moderator, I want to deselect a problem from coding when no team forms or participants lose interest so the problem returns to the event agenda rather than the general backlog.
 *(Spec: Ch.27.5)*
@@ -188,6 +200,22 @@ As a moderator on mobile, I want decision buttons organized into collapsible cat
 ### M28 – Control Timer Audio
 As a moderator, I want to enable audio cues for countdown timers during live events so participants are alerted when time is running out.
 *(Spec: Ch.14.5.1, Decision #23)*
+
+### M29 – Access Moderator Dashboard via Bottom Navigation
+As a moderator, I want a "Moderate" item in the bottom navigation bar so I can switch to the moderator dashboard with a single tap from any screen, including while walking around during a live event.
+*(Spec: Ch.12.7.3, Ch.26.16.2)*
+
+### M30 – Customize Event Reminder Content
+As a moderator, I want to edit and save a new version of the event reminder template before it is sent to all registered participants (e.g., adding notes about special guests) so the communication is contextually relevant and the system retains a history of the templates.
+*(Spec: Ch.16.6, Ch.19.3.9)*
+
+### M31 – View Email Template History
+As a moderator, I want to view previous versions of an event's email template so I can see what was communicated in the past and revert to an older version if necessary.
+*(Spec: Ch.16.6, Ch.19.3.9)*
+
+### M32 – Paginate Moderator Backlog Views
+As a moderator, I want the problem backlog in the moderator dashboard to use server-side pagination and search so I can efficiently manage events even when the global backlog contains hundreds of problems.
+*(Spec: Ch.12.5, Ch.12.10)*
 
 ---
 
@@ -278,8 +306,8 @@ As a new user, I want to confirm my email address via a link sent to my inbox so
 *(Spec: Ch.18.5, Ch.30.2)*
 
 ### U3 – Browse Upcoming Events
-As a visitor, I want to see upcoming events with images, dates, and locations on the landing page so I can decide which to attend.
-*(Spec: Ch.12.1, Ch.29.4)*
+As a visitor, I want to see upcoming events with images, dates, and locations on the landing page so I can decide which to attend. As an authenticated user, I want a dedicated Events Listing Page with temporal grouping (active, upcoming, past), location filters, and in-page registration so I can discover events across all locations.
+*(Spec: Ch.12.1, Ch.12.9, Ch.29.4)*
 
 ### U4 – Register for an Event
 As a registered user, I want to register for an event (in-presence or remote) so I can participate.
@@ -290,8 +318,8 @@ As a registered user, when in-presence capacity is full, I want to join a waitli
 *(Spec: Ch.29.6, Ch.30.8)*
 
 ### U6 – Browse Public Problems
-As a participant, I want to browse all public problems so I can see what's available for discussion.
-*(Spec: Ch.12.4, Ch.13.1)*
+As a participant, I want to browse all public problems on a dedicated Problem Backlog Page with filtering by readiness state, action state, and problem type, plus keyword search and sorting, so I can discover problems across the community.
+*(Spec: Ch.12.8, Ch.13.1)*
 
 ### U7 – Vote During a Pitch
 As a participant, I want to rate the current pitch using the active pitch inventory so my feedback is captured.
@@ -417,6 +445,38 @@ As a participant on mobile, I want to collapse less-frequently-used sections (le
 As a participant, I want to enable audio alerts for countdown timers so I'm notified when time is running out even if I'm looking away from the screen.
 *(Spec: Ch.14.5.1, Ch.19.3.1, Decision #23)*
 
+### U38 – Switch Screens via Bottom Navigation
+As a participant on mobile, I want a persistent bottom navigation bar showing the main screens (Home, Events, Problems) so I can switch between them with a single tap without navigating through menus.
+*(Spec: Ch.12.7.3, Ch.26.16.2)*
+
+### U39 – Access Account via Top-Right Avatar
+As an authenticated user, I want to see my avatar in the top-right corner of every screen so I can confirm I'm logged in and access account actions (settings, logout) with a single tap.
+*(Spec: Ch.12.7.2, Ch.26.16.1)*
+
+### U40 – See Current Location in Navigation
+As a participant, I want the bottom navigation bar to highlight which screen I'm currently on so I always know where I am in the app.
+*(Spec: Ch.12.7.3, Ch.26.16.2)*
+
+### U41 – Filter and Sort Problem Backlog
+As a participant, I want to filter the problem backlog by readiness state, action state, and problem type, and sort by creation date or review count, so I can quickly find problems that match my interests or expertise.
+*(Spec: Ch.12.8.4, Ch.12.10.3)*
+
+### U42 – Search Problems by Keyword
+As a participant, I want to type a keyword into the search bar on the Problem Backlog Page and see results updated live (debounced) so I can find specific problems without scrolling through long lists.
+*(Spec: Ch.12.8.5, Ch.12.10.2, Ch.26.17.2)*
+
+### U43 – Filter Events by Location
+As a participant, I want to filter the Events Listing Page by location (Cologne, Aachen, etc.) and time range so I can find events relevant to my geography and availability.
+*(Spec: Ch.12.9.4, Ch.12.10.3)*
+
+### U44 – Share a Filtered View
+As a participant, I want filters, search terms, and pagination to be reflected in the URL so I can share a specific filtered view with colleagues or bookmark it for later.
+*(Spec: Ch.12.10.4)*
+
+### U45 – Register for Event from Listing
+As a participant, I want to register for an upcoming event directly from the Events Listing Page without navigating to the Event Detail Page, so I can sign up quickly when browsing.
+*(Spec: Ch.12.9.2, Ch.29.5)*
+
 ---
 
 ## 23.5 Bot Management User Stories
@@ -504,5 +564,13 @@ As the system, I want to detect and record first-time achievements so celebratio
 *(Spec: Ch.19.3.37, Ch.33.2)*
 
 ### S12 – Send Event Reminder Emails
-As the system, triggered by an external event (cron job or manual trigger by moderator), I want to send reminder emails before events to registered users so attendance is maximized.
-*(Spec: Ch.29.11.1)*
+As the system, triggered by an external event (cron job or manual trigger by moderator), I want to send reminder emails before events using the currently active versioned template, so attendance is maximized.
+*(Spec: Ch.16.6, Ch.29.11.1)*
+
+### S13 – Manage Waitlist Queue and Expiration Constraints
+As the system, I want to accurately track the chronological order of the waitlist and enforce the 24-hour expiration rule, ensuring that at most one active invitation exists per available spot.
+*(Spec: Ch.19.3.7, Ch.29.6, ADR 010)*
+
+### S14 – Inject Content into Versioned Templates
+As the system, when automatically inviting a waitlisted user, I want to use the currently active version of the event's email template and append a 24-hour confirmation notice to it, so the user receives the latest contextual information alongside their specific waitlist constraints.
+*(Spec: Ch.16.6)*

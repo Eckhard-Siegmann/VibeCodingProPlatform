@@ -4,10 +4,10 @@
 	import { Badge } from '$lib/components/ui/badge';
 
 	interface Props {
-		decisions: Decision[];
+		decisions?: Decision[];
 	}
 
-	let { decisions }: Props = $props();
+	let { decisions = [] }: Props = $props();
 
 	function formatDate(dateStr: string): string {
 		return new Date(dateStr).toLocaleDateString('en-US', {

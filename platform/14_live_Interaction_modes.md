@@ -63,6 +63,32 @@ Live interaction modes do **not** introduce new domain objects. They orchestrate
   - Reflective or comparative items
 - Engagement/Intensity is typically included as a final item.
 
+### Review Participation Eligibility (Conflict of Interest)
+
+To ensure objective evaluation, certain participants are **excluded from submitting review assessments** for a given problem:
+
+- **Problem Owner (PO)**: The user who created the problem (`problems.created_by`) cannot submit review responses for their own problem's review assessment.
+- **Active Team Members (coders)**: Users with an active `coder` membership in `problem_team_members` for the assessed problem cannot submit review responses.
+- **PO Deputies**: Users with `po_deputy` membership are also excluded (they share ownership responsibility with the PO).
+
+This constraint applies only to **review assessments** (inventory_key = `review_assessment`), not to pitch assessments or self-assessments. The rationale is that review assessments evaluate the quality of code produced by the team — team members evaluating their own work would bias the results.
+
+**Enforcement**: The `/api/assess/[assessmentId]/responses` endpoint checks the submitter's relationship to the assessed problem before accepting review responses (see Chapter 18 §18.14.5).
+
+**Note**: This is distinct from the Moderator Objectivity Constraint (Ch.12.5), which prevents moderators who are coding on a problem from making binding *decisions*. The review participation constraint prevents team members from submitting *assessment responses* for their own problem.
+
+### Review Weight Assignment
+
+Each review response is tagged with a `review_weight_key` (FK to `review_weight_catalog`) at submission time, determining the multiplier applied during star award calculations (Chapter 33.6.4). The assignment follows these rules:
+
+| Condition | Weight Key | Multiplier |
+|-----------|-----------|------------|
+| `time_context = 'review'` (live during event) | `live_review` | 1.0x |
+| `time_context = 'post_event'` or `'late_reflection'` | `post_event_review` | 1.5x |
+| `role = 'agent'` (overrides time context) | `agent_review` | 0.5x |
+
+The weight key is set server-side at response insertion time and cannot be overridden by the client. For non-review assessments (pitch, self-assessment), `review_weight_key` is `NULL`.
+
 ### Duration and Asynchronicity
 - Review Mode may remain open beyond the event itself.
 - Participants can submit or update responses until closure.
@@ -220,11 +246,19 @@ When phases change, notify participants clearly.
 | Coding ending soon | "⏰ 15 minutes remaining" | Banner + sound option |
 | Coding ended | "🏁 Time's up! Wrap up your work." | Banner + timer stop |
 
+**Detection & Delivery Mechanism (ADR 008):**
+Phase transitions are detected client-side via adaptive polling (3s during active events). When polling detects a mode change in `event_live_context`, the client:
+1. Updates the **LiveBanner** (§14.5.3) to reflect the new state
+2. Fires a **toast notification** (Ch.26.11.12) with the corresponding message from the table above
+3. Optionally plays an **audio cue** if the user has enabled sound (Ch.14.5.1, `audio_cues_enabled`)
+
+Toasts ensure users on any page (not just the dashboard) are informed of transitions. The LiveBanner provides persistent state; the toast provides the transient "something just changed" signal.
+
 **Sound Cues (Optional):**
-- Short, pleasant chime for phase opens
-- Warning tone for "closing soon"
-- Completion tone for phase closes
-- User preference to disable sounds
+- Short, pleasant chime for phase opens (`audioStore.playPhaseChange()`)
+- Warning tone for "closing soon" (`audioStore.playTimerWarning()`)
+- Completion tone for phase closes (`audioStore.playTimerExpired()`)
+- User preference to disable sounds (persisted in `audio_cues_enabled`, toggled via LiveBanner icon)
 
 ### 14.5.3 "What's Happening Now?" Banner
 

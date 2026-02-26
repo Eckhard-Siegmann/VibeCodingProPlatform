@@ -3,10 +3,10 @@
 	 * ChatThread - Threaded message display with collapse/expand.
 	 *
 	 * Features per Ch.26.15.3:
-	 * - Collapsed: Shows "3 replies" indicator, tap to expand
+	 * - Collapsed: Shows "▶ 3 replies" indicator, tap to expand
 	 * - Expanded: Indent 40px, vertical thread line
-	 * - Max 3 levels deep (per spec, deeper replies flatten with text indicator)
-	 * - Tap parent header or outside to collapse
+	 * - Nested replies show "Replying to {Name}" quote indicator
+	 * - Tap collapse header to collapse
 	 */
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils';
@@ -15,8 +15,6 @@
 	interface Props extends HTMLAttributes<HTMLDivElement> {
 		parentMessage: ChatMessageData;
 		replies: ChatMessageData[];
-		depth?: number;
-		maxDepth?: number;
 		onReply?: (messageId: string) => void;
 		onReact?: (messageId: string, emoji: string) => void;
 		class?: string;
@@ -25,8 +23,6 @@
 	let {
 		parentMessage,
 		replies,
-		depth = 0,
-		maxDepth = 3,
 		onReply,
 		onReact,
 		class: className,
@@ -49,6 +45,20 @@
 		return currTime - prevTime > twoMinutes;
 	}
 
+	/**
+	 * Find the author name for a given message ID within the thread.
+	 * Used to show "Replying to {Name}" for nested replies.
+	 */
+	function getReplyTargetName(replyToId: string | null | undefined): string | null {
+		if (!replyToId) return null;
+		// Direct reply to parent — no indicator needed (contextually obvious)
+		if (replyToId === parentMessage.messageId) return null;
+		// Reply to another reply in the thread — show "Replying to {Name}"
+		const target = replies.find((r) => r.messageId === replyToId);
+		if (target) return target.authorName;
+		return null;
+	}
+
 	function toggleExpand() {
 		isExpanded = !isExpanded;
 	}
@@ -66,13 +76,16 @@
 	}
 
 	const replyCount = $derived(replies.length);
-	const canNest = $derived(depth < maxDepth);
+
+	// Suppress replyCount on parent so ChatMessage doesn't show its own
+	// thread indicator — ChatThread handles that.
+	const parentForDisplay = $derived({ ...parentMessage, replyCount: 0 });
 </script>
 
 <div class={cn('w-full', className)} {...restProps}>
 	<!-- Parent message -->
 	<ChatMessage
-		message={parentMessage}
+		message={parentForDisplay}
 		showHeader={true}
 		onReply={handleParentReply}
 		onReact={(emoji) => handleReact(parentMessage.messageId, emoji)}
@@ -81,7 +94,7 @@
 	<!-- Thread indicator / replies -->
 	{#if replyCount > 0}
 		{#if !isExpanded}
-			<!-- Collapsed indicator -->
+			<!-- Collapsed indicator (Ch.26.15.3) -->
 			<button
 				type="button"
 				class={cn(
@@ -95,7 +108,7 @@
 				<span>{replyCount} {replyCount === 1 ? 'reply' : 'replies'}</span>
 			</button>
 		{:else}
-			<!-- Expanded thread -->
+			<!-- Expanded thread (Ch.26.15.3) -->
 			<div class="relative mt-2">
 				<!-- Thread line -->
 				<div
@@ -120,26 +133,19 @@
 				<!-- Reply messages -->
 				<div class="pl-10 space-y-1">
 					{#each replies as reply, index}
-						{#if canNest}
-							<!-- If the reply itself has nested replies, this would recurse -->
-							<ChatMessage
-								message={reply}
-								showHeader={shouldShowHeader(reply, index, replies)}
-								onReply={() => handleChildReply(reply.messageId)}
-								onReact={(emoji) => handleReact(reply.messageId, emoji)}
-							/>
-						{:else}
-							<!-- Max depth reached: show flat with indicator -->
-							<div class="flex items-start gap-2">
-								<span class="text-xs text-meta italic shrink-0">In reply to {parentMessage.authorName}:</span>
+						{@const replyTargetName = getReplyTargetName(reply.replyToMessageId)}
+						{#if replyTargetName}
+							<!-- Nested reply: show "Replying to {Name}" indicator -->
+							<div class="flex items-center gap-1 px-1 mb-0.5">
+								<span class="text-[10px] text-meta italic">Replying to {replyTargetName}</span>
 							</div>
-							<ChatMessage
-								message={reply}
-								showHeader={shouldShowHeader(reply, index, replies)}
-								onReply={() => handleChildReply(reply.messageId)}
-								onReact={(emoji) => handleReact(reply.messageId, emoji)}
-							/>
 						{/if}
+						<ChatMessage
+							message={reply}
+							showHeader={shouldShowHeader(reply, index, replies)}
+							onReply={() => handleChildReply(reply.messageId)}
+							onReact={(emoji) => handleReact(reply.messageId, emoji)}
+						/>
 					{/each}
 				</div>
 			</div>
